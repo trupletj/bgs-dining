@@ -1,16 +1,24 @@
 "use client";
 
+import { useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
 import { useCurrentMeal } from "@/hooks/use-current-meal";
 import { useKioskConfig } from "@/hooks/use-kiosk-config";
+import { useSync } from "@/hooks/use-sync";
 import { KIOSK_CONFIG_KEYS, MEAL_TYPE_COLUMN_MAP } from "@/lib/constants";
-import { Users, CheckCircle2, Clock } from "lucide-react";
+import { Users, CheckCircle2, Clock, RefreshCw } from "lucide-react";
 
 export function ChefDashboard() {
-  const { currentMeal } = useCurrentMeal();
+  const { currentMeal, currentTime } = useCurrentMeal();
   const { value: diningHallId } = useKioskConfig(KIOSK_CONFIG_KEYS.DINING_HALL_ID);
-  const today = new Date().toISOString().split("T")[0];
+  const { syncEmployees, state } = useSync();
+
+  // Reactive today — updates when currentTime changes (every 60s via useCurrentMeal)
+  const today = useMemo(
+    () => currentTime.toISOString().split("T")[0],
+    [currentTime]
+  );
 
   // Expected: count of userMealConfigs where current meal's location column = this diningHallId
   const expected = useLiveQuery(async () => {
@@ -32,15 +40,14 @@ export function ChefDashboard() {
   }, [currentMeal?.id, diningHallId]);
 
   // Served: count of mealLogs for today + current meal + this dining hall
+  // Uses individual "date" index instead of broken compound index between()
   const served = useLiveQuery(async () => {
     if (!currentMeal || !diningHallId) return 0;
+    const hallId = Number(diningHallId);
     return db.mealLogs
-      .where("[userId+mealType+date]")
-      .between(
-        ["", currentMeal.id, today],
-        ["\uffff", currentMeal.id, today]
-      )
-      .filter((l) => l.diningHallId === Number(diningHallId))
+      .where("date")
+      .equals(today)
+      .filter((l) => l.mealType === currentMeal.id && l.diningHallId === hallId)
       .count();
   }, [currentMeal?.id, diningHallId, today]);
 
@@ -51,7 +58,15 @@ export function ChefDashboard() {
   if (!currentMeal) return null;
 
   return (
-    <div className="flex gap-3 px-4 py-3 border-b">
+    <div className="flex shrink-0 flex-wrap gap-3 px-4 py-3 border-b">
+      <button
+        onClick={() => syncEmployees()}
+        disabled={state === "syncing"}
+        className="ml-auto flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm text-muted-foreground hover:bg-muted disabled:opacity-50"
+      >
+        <RefreshCw className={`h-4 w-4 ${state === "syncing" ? "animate-spin" : ""}`} />
+        Шинэчлэх
+      </button>
       <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 dark:bg-blue-950">
         <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
         <div>
@@ -73,6 +88,7 @@ export function ChefDashboard() {
           <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{remaining}</div>
         </div>
       </div>
+      
     </div>
   );
 }

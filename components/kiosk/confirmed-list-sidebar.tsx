@@ -21,9 +21,9 @@ export function ConfirmedListSidebar() {
   });
 
   return (
-    <div className="flex flex-1 flex-col bg-card overflow-hidden">
+    <div className="flex flex-1 flex-col bg-card min-h-0">
       <div className="flex items-center gap-2 border-b px-4 py-3">
-        <Users className="h-4 w-4 text-muted-foreground" />
+        <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
         <h3 className="text-sm font-semibold">Бүртгүүлсэн</h3>
         <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
           {logs.length}
@@ -41,31 +41,31 @@ export function ConfirmedListSidebar() {
         ) : (
           <ul className="divide-y">
             {logs.map((log) => (
-              <li key={log.id} className="flex items-center gap-3 px-4 py-2.5">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1">
-                    <p className="truncate text-sm font-medium">
+              <li key={log.id} className="flex items-start gap-3 px-4 py-2.5">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-1">
+                    <p className="text-sm font-medium break-words">
                       {log.employeeName}
                     </p>
                     {log.isExtraServing && (
-                      <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                      <Badge variant="outline" className="h-4 shrink-0 px-1 text-[10px]">
                         <Star className="h-2.5 w-2.5 mr-0.5" />
                         Нэмэлт
                       </Badge>
                     )}
                     {log.isManualOverride && (
-                      <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                      <Badge variant="outline" className="h-4 shrink-0 px-1 text-[10px]">
                         <Hand className="h-2.5 w-2.5 mr-0.5" />
                         Гараар
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground break-words">
                     {log.idcardNumber}
                   </p>
                 </div>
-                <span className="shrink-0 text-xs text-muted-foreground">
+                <span className="mt-0.5 shrink-0 text-xs text-muted-foreground">
                   {new Date(log.scannedAt).toLocaleTimeString("mn-MN", {
                     hour: "2-digit",
                     minute: "2-digit",

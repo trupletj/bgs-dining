@@ -316,7 +316,7 @@ export function ScanScreen() {
           <IdleScreen />
           <CameraScanner onScan={handleScan} />
         </div>
-        <div className="flex h-full w-80 flex-col border-l">
+        <div className="flex h-full w-96 flex-col border-l overflow-hidden">
           <ChefDashboard />
           <ConfirmedListSidebar />
         </div>

@@ -6,6 +6,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Offline-first PWA for canteen meal attendance tracking via USB barcode scanner and camera QR code. Dual-mode: fullscreen kiosk for scanning employee badges, and PIN-protected admin panel for configuration. All UI text is in **Mongolian (mn)**.
 
+## Recent Work Summary (2026-02-14)
+
+Latest in-progress kiosk updates (currently modified locally):
+
+- `components/kiosk/chef-dashboard.tsx`
+  - Made `today` reactive using `currentTime` + `useMemo` to avoid stale date issues.
+  - Added manual employee sync trigger button (`Шинэчлэх`) with loading state via `useSync`.
+  - Changed served-count query to use `where("date").equals(today)` + filter by meal/dining hall (avoids brittle compound-range behavior).
+  - Minor layout improvements for tighter/responsive header behavior.
+
+- `components/kiosk/confirmed-list-sidebar.tsx`
+  - Improved overflow handling and list rendering for long names/IDs.
+  - Added safer wrapping (`break-words`) and better badge/icon alignment.
+
+- `components/kiosk/manual-entry.tsx`
+  - Expanded dialog width for easier operator use.
+  - Improved list text wrapping and right padding for readability.
+
+- `components/kiosk/scan-screen.tsx`
+  - Increased sidebar width (`w-80` → `w-96`) and added overflow control for stable kiosk layout.
+
+Intent: improve operational reliability for live canteen scanning (reactive counts/date handling) and reduce UI clipping issues in the operator panel.
+
 ## Commands
 
 ```bash

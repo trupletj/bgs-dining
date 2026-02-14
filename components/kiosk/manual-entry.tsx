@@ -86,7 +86,7 @@ export function ManualEntry() {
           Гараар бүртгэх
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-3xl">
         <DialogHeader>
           <DialogTitle>Гараар бүртгэх</DialogTitle>
         </DialogHeader>
@@ -108,16 +108,16 @@ export function ManualEntry() {
                 {search ? "Олдсонгүй" : "Ажилтан ачааллаж байна..."}
               </p>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-1 pr-3">
                 {filtered.map((emp) => (
                   <button
                     key={emp.id}
                     onClick={() => handleSelect(emp)}
                     className="flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left hover:bg-accent transition-colors"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{emp.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium break-words">{emp.name}</p>
+                      <p className="text-xs text-muted-foreground break-words">
                         {emp.idcardNumber} | {emp.department}
                       </p>
                     </div>

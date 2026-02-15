@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/lib/db";
+import { db, type Employee, type MealLog } from "@/lib/db";
 import { useCurrentMeal } from "@/hooks/use-current-meal";
 import { useKioskConfig } from "@/hooks/use-kiosk-config";
 import { createMealLog, checkDuplicateMealLog } from "@/hooks/use-meal-logs";
@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { DoubleScanModal } from "@/components/kiosk/double-scan-modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,9 +22,15 @@ import { Badge } from "@/components/ui/badge";
 import { UserPlus, Search, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
+interface DuplicateInfo {
+  employee: Employee;
+  existingLog: MealLog;
+}
+
 export function ManualEntry() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [duplicate, setDuplicate] = useState<DuplicateInfo | null>(null);
   const { currentMeal } = useCurrentMeal();
   const { value: diningHallId } = useKioskConfig(KIOSK_CONFIG_KEYS.DINING_HALL_ID);
   const { value: activeChefId } = useKioskConfig(KIOSK_CONFIG_KEYS.ACTIVE_CHEF_ID);
@@ -46,7 +53,7 @@ export function ManualEntry() {
       .slice(0, 50);
   }, [allEmployees, search]);
 
-  const handleSelect = async (employee: typeof filtered[number]) => {
+  const handleSelect = async (employee: Employee) => {
     if (!currentMeal || !diningHallId) {
       toast.error("Хоолны цаг эсвэл гал тогоо тохируулаагүй");
       return;
@@ -55,7 +62,7 @@ export function ManualEntry() {
     const today = new Date().toISOString().split("T")[0];
     const existing = await checkDuplicateMealLog(employee.id, currentMeal.id, today);
     if (existing) {
-      toast.warning(`${employee.name} аль хэдийн бүртгүүлсэн`);
+      setDuplicate({ employee, existingLog: existing });
       return;
     }
 
@@ -78,6 +85,31 @@ export function ManualEntry() {
     toast.success(`${employee.name} бүртгэгдлээ`);
   };
 
+  const handleAddExtraServing = useCallback(async () => {
+    if (!duplicate || !currentMeal || !diningHallId) return;
+    const { employee } = duplicate;
+    const today = new Date().toISOString().split("T")[0];
+
+    await createMealLog({
+      userId: employee.id,
+      idcardNumber: employee.idcardNumber,
+      employeeName: employee.name,
+      mealType: currentMeal.id,
+      diningHallId: Number(diningHallId),
+      date: today,
+      scannedAt: new Date().toISOString(),
+      syncStatus: "pending",
+      isExtraServing: true,
+      isManualOverride: true,
+      chefId: activeChefId ? Number(activeChefId) : null,
+      deviceUuid: deviceUuid ?? null,
+      syncKey: `manual-${employee.id}-${currentMeal.id}-${today}-extra-${Date.now()}`,
+    });
+
+    setDuplicate(null);
+    toast.success(`${employee.name} нэмэлт порц бүртгэгдлээ`);
+  }, [duplicate, currentMeal, diningHallId, activeChefId, deviceUuid]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -86,7 +118,7 @@ export function ManualEntry() {
           Гараар бүртгэх
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-3xl">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-3xl rounded-2xl">
         <DialogHeader>
           <DialogTitle>Гараар бүртгэх</DialogTitle>
         </DialogHeader>
@@ -97,7 +129,7 @@ export function ManualEntry() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Нэр, код, хэлтсээр хайх..."
-              className="pl-9"
+              className="pl-9 rounded-xl h-11"
               autoFocus
             />
           </div>
@@ -113,7 +145,7 @@ export function ManualEntry() {
                   <button
                     key={emp.id}
                     onClick={() => handleSelect(emp)}
-                    className="flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left hover:bg-accent transition-colors"
+                    className="flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left hover:bg-accent hover:shadow-sm transition-all duration-200"
                   >
                     <div className="flex-1">
                       <p className="text-sm font-medium break-words">{emp.name}</p>
@@ -131,6 +163,17 @@ export function ManualEntry() {
           </ScrollArea>
         </div>
       </DialogContent>
+
+      {duplicate && (
+        <DoubleScanModal
+          open={true}
+          onClose={() => setDuplicate(null)}
+          onAddExtraServing={handleAddExtraServing}
+          employeeName={duplicate.employee.name}
+          mealName={currentMeal?.name ?? ""}
+          existingScanTime={duplicate.existingLog.scannedAt}
+        />
+      )}
     </Dialog>
   );
 }

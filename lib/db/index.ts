@@ -61,6 +61,16 @@ export interface Chef {
   isActive: boolean;
 }
 
+export interface MealLocationOverride {
+  id: number; // bigint from Supabase
+  userId: string; // uuid
+  btegId: string;
+  date: string; // YYYY-MM-DD
+  mealType: string; // breakfast, lunch, dinner, etc.
+  diningHallId: number;
+  note: string | null;
+}
+
 export interface KioskConfig {
   key: string;
   value: string;
@@ -69,7 +79,7 @@ export interface KioskConfig {
 
 export interface SyncLog {
   id?: number;
-  type: "pull-employees" | "pull-dining-halls" | "pull-chefs" | "push-meal-logs" | "heartbeat";
+  type: "pull-employees" | "pull-dining-halls" | "pull-chefs" | "pull-overrides" | "push-meal-logs" | "heartbeat";
   status: "started" | "success" | "failed";
   recordCount: number;
   startedAt: string;
@@ -84,6 +94,7 @@ class CanteenDB extends Dexie {
   mealTimeSlots!: EntityTable<MealTimeSlot, "id">;
   diningHalls!: EntityTable<DiningHall, "id">;
   chefs!: EntityTable<Chef, "id">;
+  mealLocationOverrides!: EntityTable<MealLocationOverride, "id">;
   kioskConfig!: EntityTable<KioskConfig, "key">;
   syncLog!: EntityTable<SyncLog, "id">;
 
@@ -150,6 +161,11 @@ class CanteenDB extends Dexie {
           // mealConfirmations already dropped, nothing to migrate
         }
       });
+
+    // v4: Add mealLocationOverrides table
+    this.version(4).stores({
+      mealLocationOverrides: "id, [userId+date+mealType], [date+diningHallId]",
+    });
   }
 }
 

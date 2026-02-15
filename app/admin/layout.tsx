@@ -12,7 +12,7 @@ export default function AdminLayout({
     <PinGate>
       <div className="flex h-screen">
         <AdminNav />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        <main className="flex-1 overflow-auto p-8 bg-muted/10">{children}</main>
       </div>
     </PinGate>
   );

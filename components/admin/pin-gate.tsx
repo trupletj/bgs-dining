@@ -38,11 +38,11 @@ export function PinGate({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex h-screen items-center justify-center bg-muted/50">
-      <Card className="w-full max-w-sm">
+    <div className="flex h-screen items-center justify-center bg-gradient-to-b from-muted/40 to-background">
+      <Card className="w-full max-w-sm rounded-2xl shadow-lg">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 rounded-full bg-muted p-3">
-            <Lock className="h-6 w-6 text-muted-foreground" />
+          <div className="mx-auto mb-2 rounded-full bg-primary/5 p-3 ring-1 ring-primary/10">
+            <Lock className="h-6 w-6 text-primary/70" />
           </div>
           <CardTitle>Админ нэвтрэх</CardTitle>
         </CardHeader>
@@ -58,16 +58,17 @@ export function PinGate({ children }: { children: ReactNode }) {
                 placeholder="ПИН код оруулна уу"
                 autoFocus
                 maxLength={10}
+                className="rounded-xl"
               />
               {error && <p className="text-sm text-destructive">{error}</p>}
             </div>
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full rounded-xl">
               Нэвтрэх
             </Button>
           </form>
 
           <Link href="/">
-            <Button variant="ghost" className="w-full gap-2 text-muted-foreground mt-2">
+            <Button variant="ghost" className="w-full gap-2 text-muted-foreground mt-2 transition-colors duration-200">
               <ChefHat className="h-4 w-4" />
               Тогооч нэвтрэх
             </Button>

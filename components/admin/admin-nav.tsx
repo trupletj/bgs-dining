@@ -30,10 +30,10 @@ export function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex w-56 flex-col border-r bg-card">
+    <aside className="flex w-60 flex-col border-r bg-card/80 backdrop-blur-sm shadow-[1px_0_12px_-4px_rgba(0,0,0,0.05)]">
       <div className="p-4">
         <Link href="/">
-          <Button variant="ghost" size="sm" className="w-full justify-start gap-2">
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 rounded-xl transition-all duration-200">
             <ArrowLeft className="h-4 w-4" />
             Киоск руу буцах
           </Button>
@@ -42,7 +42,7 @@ export function AdminNav() {
 
       <Separator />
 
-      <nav className="flex flex-1 flex-col gap-1 p-2">
+      <nav className="flex flex-1 flex-col gap-0.5 p-2 px-3">
         {navItems.map((item) => {
           const isActive =
             item.href === "/admin"
@@ -51,11 +51,11 @@ export function AdminNav() {
           return (
             <Link key={item.href} href={item.href}>
               <Button
-                variant={isActive ? "secondary" : "ghost"}
+                variant="ghost"
                 size="sm"
                 className={cn(
-                  "w-full justify-start gap-2",
-                  isActive && "font-medium"
+                  "w-full justify-start gap-2 rounded-xl transition-all duration-200",
+                  isActive && "bg-primary/10 text-primary shadow-sm font-medium"
                 )}
               >
                 <item.icon className="h-4 w-4" />

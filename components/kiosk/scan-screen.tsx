@@ -150,49 +150,71 @@ export function ScanScreen() {
           return;
         }
 
-        // 4. Get userMealConfigs
-        const config = await db.userMealConfigs.get(employee.id);
-        if (!config) {
-          // No meal config → unauthorized modal
-          setPendingModal({
-            type: "unauthorized",
-            employee,
-            scannedCode: code,
-            message: `${employee.name} хоолны тохиргоо хийгдээгүй байна`,
-          });
-          setScanState("idle");
-          return;
-        }
-
-        // 5. Check meal location for current slot
-        const location = getMealLocationForSlot(config, currentMeal.id);
-        if (location === null) {
-          // Meal not configured for this employee
-          setPendingModal({
-            type: "unauthorized",
-            employee,
-            scannedCode: code,
-            message: `${employee.name} "${currentMeal.name}" хоолонд бүртгэлгүй`,
-          });
-          setScanState("idle");
-          return;
-        }
-        if (location !== "skip" && diningHallId && location !== Number(diningHallId)) {
-          // Wrong dining hall
-          const correctHall = await db.diningHalls.get(location);
-          playSound("error");
-          setConfirmationResult({
-            type: "error",
-            title: "Буруу гал тогоо",
-            message: `${employee.name} "${correctHall?.name ?? location}" гал тогоонд бүртгэлтэй`,
-            employeeName: employee.name,
-          });
-          setScanState("result");
-          return;
-        }
-
-        // 6. Check duplicate
+        // 4. Check meal location override first, then default config
         const today = new Date().toISOString().split("T")[0];
+        const override = await db.mealLocationOverrides
+          .where("[userId+date+mealType]")
+          .equals([employee.id, today, currentMeal.id])
+          .first();
+
+        if (override) {
+          // Override exists — check if it points to THIS dining hall
+          if (diningHallId && override.diningHallId !== Number(diningHallId)) {
+            // Employee was redirected to a different hall today
+            const targetHall = await db.diningHalls.get(override.diningHallId);
+            playSound("error");
+            setConfirmationResult({
+              type: "error",
+              title: "Шилжүүлсэн",
+              message: `${employee.name} өнөөдөр "${targetHall?.name ?? override.diningHallId}" руу шилжүүлсэн`,
+              employeeName: employee.name,
+            });
+            setScanState("result");
+            return;
+          }
+          // Override matches this hall → allowed, skip default config check
+        } else {
+          // No override — use default config logic
+          const config = await db.userMealConfigs.get(employee.id);
+          if (!config) {
+            // No meal config and no override → unauthorized modal
+            setPendingModal({
+              type: "unauthorized",
+              employee,
+              scannedCode: code,
+              message: `${employee.name} хоолны тохиргоо хийгдээгүй байна`,
+            });
+            setScanState("idle");
+            return;
+          }
+
+          // Check meal location for current slot
+          const location = getMealLocationForSlot(config, currentMeal.id);
+          if (location === null) {
+            setPendingModal({
+              type: "unauthorized",
+              employee,
+              scannedCode: code,
+              message: `${employee.name} "${currentMeal.name}" хоолонд бүртгэлгүй`,
+            });
+            setScanState("idle");
+            return;
+          }
+          if (location !== "skip" && diningHallId && location !== Number(diningHallId)) {
+            const correctHall = await db.diningHalls.get(location);
+            playSound("error");
+            setConfirmationResult({
+              type: "error",
+              title: "Буруу гал тогоо",
+              message: `${employee.name} "${correctHall?.name ?? location}" гал тогоонд бүртгэлтэй`,
+              employeeName: employee.name,
+            });
+            setScanState("result");
+            return;
+          }
+        }
+
+        // 5. Check duplicate
         const existing = await checkDuplicateMealLog(employee.id, currentMeal.id, today);
         if (existing) {
           setPendingModal({
@@ -303,22 +325,34 @@ export function ScanScreen() {
   });
 
   return (
-    <div className="flex h-screen flex-col select-none" onContextMenu={(e) => e.preventDefault()}>
-      <StatusBar />
+    <div className="flex h-screen flex-col select-none bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" onContextMenu={(e) => e.preventDefault()}>
+      {/* Animated radial gradient overlay */}
+      <div className="pointer-events-none fixed inset-0 z-0 opacity-30" style={{ background: "radial-gradient(ellipse at 20% 50%, rgba(59,130,246,0.15) 0%, transparent 50%), radial-gradient(ellipse at 80% 50%, rgba(139,92,246,0.1) 0%, transparent 50%)" }} />
 
-      <div className="flex items-center justify-between border-b px-6 py-2">
-        <CurrentMealDisplay />
-        <ManualEntry />
-      </div>
+      <div className="relative z-10 flex h-screen flex-col">
+        <StatusBar />
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex flex-1 flex-col items-center justify-center gap-6">
-          <IdleScreen />
-          <CameraScanner onScan={handleScan} />
+        <div className="flex items-center justify-between border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-6 py-2.5 shadow-[0_1px_0_0_rgba(255,255,255,0.02)]">
+          <CurrentMealDisplay />
+          <ManualEntry />
         </div>
-        <div className="flex h-full w-96 flex-col border-l overflow-hidden">
-          <ChefDashboard />
-          <ConfirmedListSidebar />
+
+        <div className="flex flex-1 overflow-hidden">
+          <div className="relative flex flex-1 flex-col items-center justify-center gap-6 overflow-hidden">
+            {/* Animated background blobs */}
+            <div className="pointer-events-none absolute inset-0">
+              <div className="animate-pulse-slow absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-blue-500/5 blur-3xl" />
+              <div className="animate-pulse-slow absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-purple-500/5 blur-3xl" style={{ animationDelay: "2s" }} />
+            </div>
+            <IdleScreen />
+            <CameraScanner onScan={handleScan} />
+          </div>
+          <div className="relative flex h-full w-96 flex-col overflow-hidden border-l border-white/5 bg-slate-900/60 backdrop-blur-2xl shadow-[-4px_0_24px_-4px_rgba(0,0,0,0.3)]">
+            {/* Glass shine overlay */}
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent" />
+            <ChefDashboard />
+            <ConfirmedListSidebar />
+          </div>
         </div>
       </div>
 

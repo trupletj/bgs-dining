@@ -85,7 +85,7 @@ export default function EmployeesPage() {
         </p>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Жагсаалт</CardTitle>
@@ -101,7 +101,7 @@ export default function EmployeesPage() {
                 setPage(0);
               }}
               placeholder="Нэр, код, үнэмлэх №, хэлтсээр хайх..."
-              className="pl-9"
+              className="pl-9 rounded-xl h-11"
             />
           </div>
 
@@ -116,7 +116,7 @@ export default function EmployeesPage() {
             <>
               <ScrollArea className="h-[500px]">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 bg-card z-10">
                     <TableRow>
                       <TableHead>Код</TableHead>
                       <TableHead>Үнэмлэх №</TableHead>
@@ -128,7 +128,7 @@ export default function EmployeesPage() {
                   </TableHeader>
                   <TableBody>
                     {paged.map((emp) => (
-                      <TableRow key={emp.id}>
+                      <TableRow key={emp.id} className="hover:bg-muted/50 transition-colors">
                         <TableCell className="font-mono text-sm">
                           {emp.employeeCode}
                         </TableCell>
@@ -167,7 +167,7 @@ export default function EmployeesPage() {
                     <button
                       onClick={() => setPage((p) => Math.max(0, p - 1))}
                       disabled={page === 0}
-                      className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+                      className="rounded-lg border px-4 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
                     >
                       Өмнөх
                     </button>
@@ -176,7 +176,7 @@ export default function EmployeesPage() {
                         setPage((p) => Math.min(totalPages - 1, p + 1))
                       }
                       disabled={page >= totalPages - 1}
-                      className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+                      className="rounded-lg border px-4 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
                     >
                       Дараах
                     </button>

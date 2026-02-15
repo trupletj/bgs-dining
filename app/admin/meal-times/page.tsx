@@ -52,7 +52,7 @@ export default function MealTimesPage() {
         </p>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <CardTitle>Цагийн хуваарь</CardTitle>
         </CardHeader>
@@ -61,13 +61,14 @@ export default function MealTimesPage() {
             {editSlots.map((slot, i) => (
               <div
                 key={slot.id}
-                className="grid grid-cols-[1fr_120px_120px_80px] items-end gap-4 rounded-lg border p-4"
+                className="grid grid-cols-[1fr_120px_120px_80px] items-end gap-4 rounded-xl bg-muted/20 hover:bg-muted/40 transition-colors border p-4"
               >
                 <div className="space-y-1">
                   <Label>Нэр</Label>
                   <Input
                     value={slot.name}
                     onChange={(e) => handleChange(i, "name", e.target.value)}
+                    className="rounded-xl"
                   />
                 </div>
                 <div className="space-y-1">
@@ -78,6 +79,7 @@ export default function MealTimesPage() {
                     onChange={(e) =>
                       handleChange(i, "startTime", e.target.value)
                     }
+                    className="rounded-xl"
                   />
                 </div>
                 <div className="space-y-1">
@@ -88,6 +90,7 @@ export default function MealTimesPage() {
                     onChange={(e) =>
                       handleChange(i, "endTime", e.target.value)
                     }
+                    className="rounded-xl"
                   />
                 </div>
                 <div className="flex flex-col items-center gap-1">
@@ -103,7 +106,7 @@ export default function MealTimesPage() {
             ))}
           </div>
 
-          <Button onClick={handleSave} className="mt-6">
+          <Button onClick={handleSave} className="mt-6 rounded-xl shadow-sm">
             Хадгалах
           </Button>
         </CardContent>

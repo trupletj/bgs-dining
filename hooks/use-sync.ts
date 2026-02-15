@@ -6,6 +6,7 @@ import {
   pullEmployees,
   pullDiningHalls,
   pullChefs,
+  pullMealLocationOverrides,
   pushMealLogs,
 } from "@/lib/sync/sync-engine";
 
@@ -81,6 +82,22 @@ export function useSync() {
     }
   }, []);
 
+  const syncOverrides = useCallback(async () => {
+    setState("syncing");
+    try {
+      const count = await pullMealLocationOverrides();
+      setState("success");
+      setTimeout(() => setState("idle"), 3000);
+      return count;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Sync failed";
+      setLastError(msg);
+      setState("error");
+      setTimeout(() => setState("idle"), 5000);
+      throw error;
+    }
+  }, []);
+
   const syncMealLogs = useCallback(async () => {
     setState("syncing");
     try {
@@ -104,6 +121,7 @@ export function useSync() {
     syncEmployees,
     syncDiningHalls,
     syncChefs,
+    syncOverrides,
     syncMealLogs,
   };
 }

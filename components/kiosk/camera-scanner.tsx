@@ -17,7 +17,7 @@ export function CameraScanner({ onScan }: CameraScannerProps) {
     <div className="flex flex-col items-center gap-3">
       <div
         id={elementId}
-        className="w-64 h-64 rounded-lg overflow-hidden bg-muted"
+        className="w-64 h-64 rounded-2xl overflow-hidden bg-muted shadow-lg ring-2 ring-primary/20"
         style={{ display: isStarted ? "block" : "none" }}
       />
 
@@ -29,7 +29,7 @@ export function CameraScanner({ onScan }: CameraScannerProps) {
         variant="outline"
         size="sm"
         onClick={isStarted ? stop : start}
-        className="gap-2"
+        className="gap-2 rounded-xl transition-all duration-200"
       >
         {isStarted ? (
           <>

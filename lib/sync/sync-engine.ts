@@ -44,8 +44,30 @@ export async function pullEmployees(): Promise<number> {
 
     const { data: configs, error: configError } = await configQuery;
     if (configError) throw new Error(`user_meal_configs: ${configError.message}`);
-    if (!configs || configs.length === 0) {
-      // Clear local and return
+
+    const allConfigs = configs || [];
+
+    // 2. Extract user IDs — merge default config users + override users
+    const defaultUserIds = allConfigs.map((c: { user_id: string }) => c.user_id);
+
+    // Also query meal_location_overrides for today pointing to this dining hall
+    let overrideUserIds: string[] = [];
+    if (diningHallId) {
+      const today = new Date().toISOString().split("T")[0];
+      const { data: overrides } = await supabase
+        .from("meal_location_overrides")
+        .select("user_id")
+        .eq("date", today)
+        .eq("dining_hall_id", diningHallId);
+      if (overrides) {
+        overrideUserIds = overrides.map((o: { user_id: string }) => o.user_id);
+      }
+    }
+
+    const userIds = [...new Set([...defaultUserIds, ...overrideUserIds])];
+
+    if (userIds.length === 0) {
+      // No default configs and no overrides — clear local and return
       await db.transaction("rw", db.employees, db.userMealConfigs, async () => {
         await db.employees.clear();
         await db.userMealConfigs.clear();
@@ -56,8 +78,18 @@ export async function pullEmployees(): Promise<number> {
       return 0;
     }
 
-    // 2. Extract user IDs
-    const userIds = configs.map((c: { user_id: string }) => c.user_id);
+    // Fetch configs for override-only users (they may not match default filter)
+    const overrideOnlyIds = overrideUserIds.filter((id) => !defaultUserIds.includes(id));
+    if (overrideOnlyIds.length > 0) {
+      for (let i = 0; i < overrideOnlyIds.length; i += 200) {
+        const batch = overrideOnlyIds.slice(i, i + 200);
+        const { data: extraConfigs } = await supabase
+          .from("user_meal_configs")
+          .select("*")
+          .in("user_id", batch);
+        if (extraConfigs) allConfigs.push(...extraConfigs);
+      }
+    }
 
     // 3. Query users in batches (Supabase has URL length limits)
     const allUsers: Record<string, unknown>[] = [];
@@ -83,7 +115,7 @@ export async function pullEmployees(): Promise<number> {
       isActive: u.is_active !== false,
     }));
 
-    const mealConfigs = configs.map((c: Record<string, unknown>) => ({
+    const mealConfigs = allConfigs.map((c: Record<string, unknown>) => ({
       userId: c.user_id as string,
       breakfastLocation: c.breakfast_location as number | null,
       lunchLocation: c.lunch_location as number | null,
@@ -217,6 +249,75 @@ export async function pullChefs(): Promise<number> {
   }
 }
 
+export async function pullMealLocationOverrides(): Promise<number> {
+  const logId = await logSync("pull-overrides", "started", 0);
+
+  try {
+    const supabase = await getSupabaseClient();
+    const today = new Date().toISOString().split("T")[0];
+
+    // Get all local employee IDs
+    const localEmployeeIds = await db.employees.toCollection().primaryKeys();
+    if (localEmployeeIds.length === 0) {
+      await db.mealLocationOverrides.clear();
+      if (typeof logId === "number") {
+        await db.syncLog.update(logId, { status: "success", recordCount: 0, completedAt: new Date().toISOString() });
+      }
+      return 0;
+    }
+
+    // Fetch overrides for today where user_id is in local employees
+    // This catches both "to this hall" and "away from this hall" overrides
+    const allOverrides: Record<string, unknown>[] = [];
+    for (let i = 0; i < localEmployeeIds.length; i += 200) {
+      const batch = localEmployeeIds.slice(i, i + 200);
+      const { data, error } = await supabase
+        .from("meal_location_overrides")
+        .select("id, user_id, bteg_id, date, meal_type, dining_hall_id, note")
+        .eq("date", today)
+        .in("user_id", batch);
+      if (error) throw new Error(`meal_location_overrides: ${error.message}`);
+      if (data) allOverrides.push(...data);
+    }
+
+    const mapped = allOverrides.map((o: Record<string, unknown>) => ({
+      id: o.id as number,
+      userId: o.user_id as string,
+      btegId: (o.bteg_id as string) || "",
+      date: o.date as string,
+      mealType: o.meal_type as string,
+      diningHallId: o.dining_hall_id as number,
+      note: (o.note as string) || null,
+    }));
+
+    await db.transaction("rw", db.mealLocationOverrides, async () => {
+      await db.mealLocationOverrides.clear();
+      if (mapped.length > 0) {
+        await db.mealLocationOverrides.bulkAdd(mapped);
+      }
+    });
+
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "success",
+        recordCount: mapped.length,
+        completedAt: new Date().toISOString(),
+      });
+    }
+
+    return mapped.length;
+  } catch (error) {
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "failed",
+        completedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    throw error;
+  }
+}
+
 export async function pushMealLogs(): Promise<number> {
   const pending = await db.mealLogs
     .where("syncStatus")
@@ -310,12 +411,14 @@ export async function runFullSync(): Promise<{
   employeesPulled: number;
   hallsPulled: number;
   chefsPulled: number;
+  overridesPulled: number;
   logsPushed: number;
 }> {
   const results = {
     employeesPulled: 0,
     hallsPulled: 0,
     chefsPulled: 0,
+    overridesPulled: 0,
     logsPushed: 0,
   };
 
@@ -342,6 +445,13 @@ export async function runFullSync(): Promise<{
     results.employeesPulled = await pullEmployees();
   } catch (e) {
     console.error("Pull employees failed:", e);
+  }
+
+  // Pull overrides after employees (needs employee list populated)
+  try {
+    results.overridesPulled = await pullMealLocationOverrides();
+  } catch (e) {
+    console.error("Pull meal location overrides failed:", e);
   }
 
   // Non-critical heartbeat

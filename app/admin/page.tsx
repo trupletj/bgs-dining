@@ -36,48 +36,48 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Ажилтнууд</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-5 w-5 text-muted-foreground/70" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{employeeCount}</div>
+            <div className="text-3xl tabular-nums font-bold">{employeeCount}</div>
             <p className="text-xs text-muted-foreground">Нийт бүртгэлтэй</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Өнөөдрийн бүртгэл</CardTitle>
-            <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
+            <UtensilsCrossed className="h-5 w-5 text-muted-foreground/70" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{todayLogs}</div>
+            <div className="text-3xl tabular-nums font-bold">{todayLogs}</div>
             <p className="text-xs text-muted-foreground">{today}</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Синк хүлээгдэж буй</CardTitle>
-            <CloudOff className="h-4 w-4 text-muted-foreground" />
+            <CloudOff className="h-5 w-5 text-muted-foreground/70" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pendingSync}</div>
+            <div className="text-3xl tabular-nums font-bold">{pendingSync}</div>
             <Badge variant={isOnline ? "default" : "destructive"} className="mt-1">
               {isOnline ? "Онлайн" : "Оффлайн"}
             </Badge>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Одоогийн хоол</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-5 w-5 text-muted-foreground/70" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-3xl tabular-nums font-bold">
               {currentMeal?.name ?? "—"}
             </div>
             {currentMeal && (
@@ -90,31 +90,31 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
             <CardTitle className="text-base">Түргэн үйлдлүүд</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             <Link href="/admin/setup">
-              <Button variant="outline" className="w-full justify-start gap-2">
+              <Button variant="outline" className="w-full justify-start gap-2 h-11 rounded-xl transition-all duration-200 hover:shadow-sm">
                 <UtensilsCrossed className="h-4 w-4" />
                 Суурь тохиргоо
               </Button>
             </Link>
             <Link href="/admin/meal-times">
-              <Button variant="outline" className="w-full justify-start gap-2">
+              <Button variant="outline" className="w-full justify-start gap-2 h-11 rounded-xl transition-all duration-200 hover:shadow-sm">
                 <Clock className="h-4 w-4" />
                 Хоолны цаг тохируулах
               </Button>
             </Link>
             <Link href="/admin/employees">
-              <Button variant="outline" className="w-full justify-start gap-2">
+              <Button variant="outline" className="w-full justify-start gap-2 h-11 rounded-xl transition-all duration-200 hover:shadow-sm">
                 <Users className="h-4 w-4" />
                 Ажилтнууд
               </Button>
             </Link>
             <Link href="/admin/records">
-              <Button variant="outline" className="w-full justify-start gap-2">
+              <Button variant="outline" className="w-full justify-start gap-2 h-11 rounded-xl transition-all duration-200 hover:shadow-sm">
                 <UtensilsCrossed className="h-4 w-4" />
                 Бүртгэл харах
               </Button>
@@ -122,24 +122,24 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
             <CardTitle className="text-base">Системийн мэдээлэл</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between">
+            <div className="flex justify-between py-1.5 border-b border-border/30">
               <span className="text-muted-foreground">Гал тогооны тоо</span>
               <span className="font-medium">{diningHallCount}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between py-1.5 border-b border-border/30">
               <span className="text-muted-foreground">Тогоочийн тоо</span>
               <span className="font-medium">{chefCount}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between py-1.5 border-b border-border/30">
               <span className="text-muted-foreground">Идэвхтэй тогооч</span>
               <span className="font-medium">{activeChefName ?? "—"}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between py-1.5">
               <span className="text-muted-foreground">Сүлжээ</span>
               <Badge variant={isOnline ? "default" : "destructive"}>
                 {isOnline ? "Онлайн" : "Оффлайн"}

@@ -46,3 +46,6 @@ public/sw.js.map
 public/workbox-*.js
 public/workbox-*.js.map
 public/swe-worker-*.js
+
+# MCP config (contains API tokens)
+.mcp.json

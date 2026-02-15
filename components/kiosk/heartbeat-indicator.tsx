@@ -37,7 +37,7 @@ export function HeartbeatIndicator() {
       <div className="flex items-center gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex items-center gap-1">
+            <div className="relative flex items-center gap-1">
               {isOnline && synced ? (
                 <Cloud className="h-4 w-4 text-green-500" />
               ) : isOnline && !synced ? (
@@ -45,6 +45,13 @@ export function HeartbeatIndicator() {
               ) : (
                 <CloudOff className="h-4 w-4 text-red-500" />
               )}
+              <span className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ${
+                isOnline && synced
+                  ? "bg-green-500 animate-pulse"
+                  : isOnline && !synced
+                    ? "bg-yellow-500"
+                    : "bg-red-500"
+              }`} />
               {pendingSync > 0 && (
                 <span className="text-[10px] font-medium text-muted-foreground">
                   {pendingSync}

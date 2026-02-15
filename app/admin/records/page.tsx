@@ -94,11 +94,11 @@ export default function RecordsPage() {
         <p className="text-muted-foreground">Хоолны бүртгэлийн жагсаалт</p>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Шүүлтүүр</CardTitle>
-            <Button variant="outline" onClick={handleExportCSV} className="gap-2">
+            <Button variant="outline" onClick={handleExportCSV} className="gap-2 rounded-xl shadow-sm">
               <Download className="h-4 w-4" />
               CSV татах
             </Button>
@@ -112,12 +112,13 @@ export default function RecordsPage() {
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
+                className="rounded-xl"
               />
             </div>
             <div className="space-y-1">
               <Label>Хоол</Label>
               <Select value={mealFilter} onValueChange={setMealFilter}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger className="w-[200px] rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -134,7 +135,7 @@ export default function RecordsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <CardTitle>
             Бүртгэл ({logs?.length ?? 0})
@@ -149,7 +150,7 @@ export default function RecordsPage() {
           ) : (
             <ScrollArea className="h-[500px]">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead>#</TableHead>
                     <TableHead>Цаг</TableHead>
@@ -166,7 +167,7 @@ export default function RecordsPage() {
                     const slot = mealSlots?.find((s) => s.id === l.mealType);
                     const chef = chefs?.find((c) => c.id === l.chefId);
                     return (
-                      <TableRow key={l.id}>
+                      <TableRow key={l.id} className="hover:bg-muted/50 transition-colors">
                         <TableCell>{i + 1}</TableCell>
                         <TableCell className="font-mono text-sm">
                           {new Date(l.scannedAt).toLocaleTimeString("mn-MN")}

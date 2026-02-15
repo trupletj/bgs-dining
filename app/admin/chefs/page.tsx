@@ -34,7 +34,7 @@ export default function ChefsPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold tracking-tight">Тогооч</h1>
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardContent className="py-8 text-center">
             <p className="text-muted-foreground">
               Эхлээд Тохиргоо хэсгээс гал тогоо сонгоно уу
@@ -116,7 +116,7 @@ export default function ChefsPage() {
         </p>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <CardTitle>Шинэ тогооч</CardTitle>
         </CardHeader>
@@ -129,6 +129,7 @@ export default function ChefsPage() {
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Тогоочийн нэр"
                 onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                className="rounded-xl"
               />
             </div>
             <div className="w-32 space-y-1">
@@ -138,9 +139,10 @@ export default function ChefsPage() {
                 onChange={(e) => setNewPin(e.target.value)}
                 placeholder="0000"
                 maxLength={6}
+                className="rounded-xl"
               />
             </div>
-            <Button onClick={handleAdd} disabled={adding} className="gap-2">
+            <Button onClick={handleAdd} disabled={adding} className="gap-2 rounded-xl shadow-sm">
               {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Нэмэх
             </Button>
@@ -148,7 +150,7 @@ export default function ChefsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <CardTitle>Тогоочийн жагсаалт</CardTitle>
         </CardHeader>
@@ -163,7 +165,7 @@ export default function ChefsPage() {
               {chefs.map((chef) => (
                 <div
                   key={chef.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
+                  className="flex items-center justify-between rounded-xl border bg-muted/20 hover:bg-muted/40 transition-colors p-4"
                 >
                   <div className="flex items-center gap-2">
                     <ChefHat className="h-4 w-4 text-muted-foreground" />

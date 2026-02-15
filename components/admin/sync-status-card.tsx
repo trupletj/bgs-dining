@@ -65,7 +65,7 @@ export function SyncStatusCard() {
   };
 
   return (
-    <Card>
+    <Card className="rounded-2xl shadow-sm">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Синк тохиргоо</CardTitle>
@@ -89,22 +89,22 @@ export function SyncStatusCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between border-b border-border/30 pb-2">
             <span className="text-muted-foreground">Supabase</span>
             <Badge variant={supabaseUrl ? "default" : "destructive"}>
               {supabaseUrl ? "Тохируулсан" : "Тохируулаагүй"}
             </Badge>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between border-b border-border/30 pb-2">
             <span className="text-muted-foreground">Төхөөрөмж UUID</span>
             <span className="font-mono text-xs truncate max-w-[180px]">{deviceUuid || "—"}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between border-b border-border/30 pb-2">
             <span className="text-muted-foreground">Сүүлд ажилтан татсан</span>
             <span>{formatDate(lastEmployeeSync)}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between border-b border-border/30 pb-2">
             <span className="text-muted-foreground">Сүүлд бүртгэл илгээсэн</span>
             <span>{formatDate(lastConfirmationSync)}</span>
           </div>
@@ -149,7 +149,7 @@ export function SyncStatusCard() {
             {recentLogs.map((log) => (
               <div
                 key={log.id}
-                className="flex items-center justify-between rounded border px-2 py-1 text-xs"
+                className="flex items-center justify-between rounded-lg bg-muted/30 border px-2 py-1 text-xs"
               >
                 <span>{log.type}</span>
                 <span>{log.recordCount} бичлэг</span>

@@ -22,7 +22,7 @@ export default function DiningHallPage() {
         </p>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <CardTitle>Бүх гал тогоо ({diningHalls.length})</CardTitle>
         </CardHeader>
@@ -36,7 +36,7 @@ export default function DiningHallPage() {
               {diningHalls.map((hall) => (
                 <div
                   key={hall.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
+                  className="flex items-center justify-between rounded-xl border bg-muted/20 hover:bg-muted/40 transition-colors p-4"
                 >
                   <div>
                     <span className="font-medium">{hall.name}</span>

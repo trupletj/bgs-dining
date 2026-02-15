@@ -99,10 +99,10 @@ function SupabaseConnectionCard() {
   };
 
   return (
-    <Card>
+    <Card className="rounded-2xl shadow-sm">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Database className="h-5 w-5" />
+          <Database className="h-5 w-5 text-primary/70" />
           <CardTitle>Supabase холболт</CardTitle>
         </div>
         <CardDescription>Supabase проектын URL ба publishable key</CardDescription>
@@ -168,10 +168,10 @@ function DiningHallAssignmentCard() {
   };
 
   return (
-    <Card>
+    <Card className="rounded-2xl shadow-sm">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Monitor className="h-5 w-5" />
+          <Monitor className="h-5 w-5 text-primary/70" />
           <CardTitle>Гал тогоо</CardTitle>
         </div>
         <CardDescription>Энэ киоск ямар гал тогоонд байрлах</CardDescription>
@@ -258,10 +258,10 @@ function DeviceRegistrationCard() {
   };
 
   return (
-    <Card>
+    <Card className="rounded-2xl shadow-sm">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Monitor className="h-5 w-5" />
+          <Monitor className="h-5 w-5 text-primary/70" />
           <CardTitle>Төхөөрөмж</CardTitle>
         </div>
         <CardDescription>Киоск төхөөрөмж бүртгэх</CardDescription>
@@ -335,10 +335,10 @@ function MaintenanceCard() {
   };
 
   return (
-    <Card>
+    <Card className="rounded-2xl shadow-sm">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <RefreshCw className="h-5 w-5" />
+          <RefreshCw className="h-5 w-5 text-primary/70" />
           <CardTitle>Засвар үйлчилгээ</CardTitle>
         </div>
         <CardDescription>Өгөгдөл синк ба цэвэрлэх</CardDescription>

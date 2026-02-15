@@ -30,17 +30,19 @@ export function DoubleScanModal({
 }: DoubleScanModalProps) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md rounded-2xl">
         <DialogHeader>
-          <div className="flex items-center gap-2">
-            <Copy className="h-5 w-5 text-yellow-500" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/30">
+              <Copy className="h-5 w-5 text-yellow-500" />
+            </div>
             <DialogTitle>Давхар бүртгэл</DialogTitle>
           </div>
           <DialogDescription>
             Энэ ажилтан аль хэдийн бүртгүүлсэн байна
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 rounded-xl bg-muted/50 p-4 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Ажилтан:</span>
             <span className="font-medium">{employeeName}</span>
@@ -63,7 +65,7 @@ export function DoubleScanModal({
           <Button variant="outline" onClick={onClose}>
             Болих
           </Button>
-          <Button onClick={onAddExtraServing}>
+          <Button onClick={onAddExtraServing} className="shadow-sm">
             Нэмэлт порц
           </Button>
         </DialogFooter>

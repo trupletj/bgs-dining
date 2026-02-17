@@ -5,15 +5,13 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
 import { useCurrentMeal } from "@/hooks/use-current-meal";
 import { useKioskConfig } from "@/hooks/use-kiosk-config";
-import { useSync } from "@/hooks/use-sync";
 import { KIOSK_CONFIG_KEYS, MEAL_TYPE_COLUMN_MAP } from "@/lib/constants";
-import { Users, CheckCircle2, Clock, RefreshCw, Hand, Star } from "lucide-react";
+import { Users, CheckCircle2, Clock, Hand, Star } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 export function ChefDashboard() {
   const { currentMeal, currentTime } = useCurrentMeal();
   const { value: diningHallId } = useKioskConfig(KIOSK_CONFIG_KEYS.DINING_HALL_ID);
-  const { syncEmployees, state } = useSync();
 
   // Reactive today — updates when currentTime changes (every 60s via useCurrentMeal)
   const today = useMemo(
@@ -163,27 +161,17 @@ export function ChefDashboard() {
           </div>
         </div>
 
-        {/* Extra (amber) - col-span-2 */}
-        <div className="group relative col-span-2 overflow-hidden rounded-xl bg-gradient-to-br from-amber-500/10 to-transparent border border-amber-400/20 px-3 py-2.5">
+        {/* Extra (amber) */}
+        <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-500/10 to-transparent border border-amber-400/20 px-3 py-2.5">
           <div className="pointer-events-none absolute -right-4 -top-4 h-16 w-16 rounded-full bg-amber-500/10 blur-xl opacity-0 transition-opacity group-hover:opacity-100" />
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center rounded-lg bg-amber-500/15 border border-amber-400/20 p-1.5">
-                <Star className="h-3.5 w-3.5 text-amber-400" />
-              </div>
-              <div>
-                <div className="text-[10px] font-medium uppercase tracking-wider text-amber-300/80">Нэмэлт</div>
-                <div className="text-xl tabular-nums font-bold text-amber-100">{extraCount}</div>
-              </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center rounded-lg bg-amber-500/15 border border-amber-400/20 p-1.5">
+              <Star className="h-3.5 w-3.5 text-amber-400" />
             </div>
-            <button
-              onClick={() => syncEmployees()}
-              disabled={state === "syncing"}
-              className="flex items-center gap-1.5 rounded-lg bg-slate-800/60 border border-white/5 px-3 py-1.5 text-xs text-slate-300 shadow-lg backdrop-blur-sm transition-all duration-200 hover:bg-slate-700/60 hover:border-white/10 disabled:opacity-50"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${state === "syncing" ? "animate-spin" : ""}`} />
-              Шинэчлэх
-            </button>
+            <div>
+              <div className="text-[10px] font-medium uppercase tracking-wider text-amber-300/80">Нэмэлт</div>
+              <div className="text-xl tabular-nums font-bold text-amber-100">{extraCount}</div>
+            </div>
           </div>
         </div>
       </div>

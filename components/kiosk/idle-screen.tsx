@@ -32,7 +32,7 @@ export function IdleScreen() {
         </div>
       </div>
 
-      <div className="text-center">
+      <div className="text-center ">
         <h2 className="bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 bg-clip-text text-4xl font-semibold tracking-tight text-transparent">
           Картаа уншуулна уу
         </h2>

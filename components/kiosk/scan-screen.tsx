@@ -14,10 +14,12 @@ import { DoubleScanModal } from "@/components/kiosk/double-scan-modal";
 import { CameraScanner } from "@/components/kiosk/camera-scanner";
 import { ChefDashboard } from "@/components/kiosk/chef-dashboard";
 import { ManualEntry } from "@/components/kiosk/manual-entry";
+import { RefreshCw } from "lucide-react";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { useScanSound } from "@/hooks/use-scan-sound";
 import { useCurrentMeal } from "@/hooks/use-current-meal";
 import { useKioskConfig } from "@/hooks/use-kiosk-config";
+import { useSync } from "@/hooks/use-sync";
 import { db, type Employee, type MealLog } from "@/lib/db";
 import { checkDuplicateMealLog, createMealLog } from "@/hooks/use-meal-logs";
 import { getMealLocationForSlot } from "@/lib/meal-type-map";
@@ -42,6 +44,7 @@ export function ScanScreen() {
   const { value: activeChefId } = useKioskConfig(KIOSK_CONFIG_KEYS.ACTIVE_CHEF_ID);
   const { value: deviceUuid } = useKioskConfig(KIOSK_CONFIG_KEYS.DEVICE_UUID);
   const { play: playSound } = useScanSound();
+  const { syncEmployees, state: syncState } = useSync();
 
   const generateSyncKey = (userId: string, mealType: string, date: string, extra: boolean) => {
     const base = `${userId}-${mealType}-${date}`;
@@ -334,7 +337,17 @@ export function ScanScreen() {
 
         <div className="flex items-center justify-between border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-6 py-2.5 shadow-[0_1px_0_0_rgba(255,255,255,0.02)]">
           <CurrentMealDisplay />
-          <ManualEntry />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => syncEmployees()}
+              disabled={syncState === "syncing"}
+              className="flex items-center gap-2 rounded-xl bg-slate-800/60 backdrop-blur-sm border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 shadow-lg transition-all duration-200 hover:bg-slate-700/60 hover:border-white/15 hover:text-slate-100 hover:shadow-[0_0_20px_-5px_rgba(59,130,246,0.2)] disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 text-blue-400 ${syncState === "syncing" ? "animate-spin" : ""}`} />
+              Шинэчлэх
+            </button>
+            <ManualEntry />
+          </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden">

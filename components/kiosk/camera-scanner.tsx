@@ -1,7 +1,6 @@
 "use client";
 
 import { Camera, CameraOff } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useCameraScanner } from "@/hooks/use-camera-scanner";
 
 interface CameraScannerProps {
@@ -17,32 +16,30 @@ export function CameraScanner({ onScan }: CameraScannerProps) {
     <div className="flex flex-col items-center gap-3">
       <div
         id={elementId}
-        className="w-64 h-64 rounded-2xl overflow-hidden bg-muted shadow-lg ring-2 ring-primary/20"
+        className="w-64 h-64 rounded-2xl overflow-hidden bg-slate-800/50 shadow-lg ring-2 ring-blue-500/20"
         style={{ display: isStarted ? "block" : "none" }}
       />
 
       {error && (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-sm text-red-400">{error}</p>
       )}
 
-      <Button
-        variant="outline"
-        size="sm"
+      <button
         onClick={isStarted ? stop : start}
-        className="gap-2 rounded-xl transition-all duration-200"
+        className="flex items-center gap-2 rounded-xl bg-slate-800/60 backdrop-blur-sm border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 shadow-lg transition-all duration-200 hover:bg-slate-700/60 hover:border-white/15 hover:text-slate-100 hover:shadow-[0_0_20px_-5px_rgba(59,130,246,0.2)]"
       >
         {isStarted ? (
           <>
-            <CameraOff className="h-4 w-4" />
+            <CameraOff className="h-4 w-4 text-red-400" />
             Камер унтраах
           </>
         ) : (
           <>
-            <Camera className="h-4 w-4" />
+            <Camera className="h-4 w-4 text-blue-400" />
             Камер асаах
           </>
         )}
-      </Button>
+      </button>
     </div>
   );
 }

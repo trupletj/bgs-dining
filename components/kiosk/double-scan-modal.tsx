@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MEAL_NAME_MAP } from "@/lib/constants";
 
 interface DoubleScanModalProps {
   open: boolean;
@@ -49,7 +50,9 @@ export function DoubleScanModal({
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Хоол:</span>
-            <span className="font-medium text-slate-100">{mealName}</span>
+            <span className="font-medium text-slate-100">
+              {getMealName(mealName)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Өмнөх бүртгэлийн цаг:</span>
@@ -65,18 +68,20 @@ export function DoubleScanModal({
           <Button
             variant="outline"
             onClick={onClose}
-            className="bg-slate-800/60 border-white/10 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100"
-          >
+            className="bg-slate-800/60 border-white/10 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100">
             Болих
           </Button>
           <Button
             onClick={onAddExtraServing}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-[0_0_20px_rgba(59,130,246,0.3)]"
-          >
+            className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-[0_0_20px_rgba(59,130,246,0.3)]">
             Нэмэлт порц
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
+}
+
+function getMealName(mealType: string) {
+  return MEAL_NAME_MAP[mealType as keyof typeof MEAL_NAME_MAP] || mealType;
 }

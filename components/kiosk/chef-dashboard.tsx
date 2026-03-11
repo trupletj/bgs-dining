@@ -7,16 +7,17 @@ import { useCurrentMeal } from "@/hooks/use-current-meal";
 import { useKioskConfig } from "@/hooks/use-kiosk-config";
 import { KIOSK_CONFIG_KEYS, MEAL_TYPE_COLUMN_MAP } from "@/lib/constants";
 import { Users, CheckCircle2, Clock, Hand, Star } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 
 export function ChefDashboard() {
   const { currentMeal, currentTime } = useCurrentMeal();
-  const { value: diningHallId } = useKioskConfig(KIOSK_CONFIG_KEYS.DINING_HALL_ID);
+  const { value: diningHallId } = useKioskConfig(
+    KIOSK_CONFIG_KEYS.DINING_HALL_ID,
+  );
 
   // Reactive today — updates when currentTime changes (every 60s via useCurrentMeal)
   const today = useMemo(
     () => currentTime.toISOString().split("T")[0],
-    [currentTime]
+    [currentTime],
   );
 
   // Expected: default config count + incoming overrides - outgoing overrides
@@ -24,7 +25,7 @@ export function ChefDashboard() {
     if (!currentMeal || !diningHallId) return 0;
 
     const hallId = Number(diningHallId);
-    const columnName = MEAL_TYPE_COLUMN_MAP[currentMeal.id];
+    const columnName = MEAL_TYPE_COLUMN_MAP[currentMeal.mealType];
 
     let defaultCount: number;
     if (columnName === null || columnName === undefined) {
@@ -39,19 +40,20 @@ export function ChefDashboard() {
       }).length;
     }
 
-    // Incoming overrides: users redirected TO this hall for today's meal
     const incoming = await db.mealLocationOverrides
       .where("[date+diningHallId]")
       .equals([today, hallId])
-      .filter((o) => o.mealType === currentMeal.id)
+      .filter((o) => o.mealType === currentMeal.mealType)
       .count();
 
-    // Outgoing overrides: users whose default is this hall but overridden elsewhere
     let outgoing = 0;
     if (columnName !== null && columnName !== undefined) {
       const allOverrides = await db.mealLocationOverrides.toArray();
       const todayOverrides = allOverrides.filter(
-        (o) => o.date === today && o.mealType === currentMeal.id && o.diningHallId !== hallId
+        (o) =>
+          o.date === today &&
+          o.mealType === currentMeal.mealType &&
+          o.diningHallId !== hallId,
       );
 
       if (todayOverrides.length > 0) {
@@ -72,12 +74,15 @@ export function ChefDashboard() {
 
   // Meal log counts for today + current meal + this dining hall
   const counts = useLiveQuery(async () => {
-    if (!currentMeal || !diningHallId) return { served: 0, manual: 0, extra: 0 };
+    if (!currentMeal || !diningHallId)
+      return { served: 0, manual: 0, extra: 0 };
     const hallId = Number(diningHallId);
     const logs = await db.mealLogs
       .where("date")
       .equals(today)
-      .filter((l) => l.mealType === currentMeal.id && l.diningHallId === hallId)
+      .filter(
+        (l) => l.mealType === currentMeal.mealType && l.diningHallId === hallId,
+      )
       .toArray();
 
     let manual = 0;
@@ -95,9 +100,21 @@ export function ChefDashboard() {
   const extraCount = counts?.extra ?? 0;
   const remaining = Math.max(0, expectedCount - servedCount);
 
-  const progressPercent = expectedCount > 0 ? Math.min(100, Math.round((servedCount / expectedCount) * 100)) : 0;
+  const progressPercent =
+    expectedCount > 0
+      ? Math.min(100, Math.round((servedCount / expectedCount) * 100))
+      : 0;
 
-  if (!currentMeal) return null;
+  if (!currentMeal) {
+    return (
+      <div className="relative flex shrink-0 flex-col gap-3 border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-4 py-8 shadow-lg items-center justify-center">
+        <Clock className="h-8 w-8 text-slate-500 animate-pulse" />
+        <p className="text-xs text-slate-400 font-medium">
+          Одоогоор хоолны цаг эхлээгүй байна
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex shrink-0 flex-col gap-3 border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-4 py-4 shadow-[0_4px_30px_-10px_rgba(0,0,0,0.3)]">
@@ -113,8 +130,12 @@ export function ChefDashboard() {
               <Users className="h-3.5 w-3.5 text-blue-400" />
             </div>
             <div>
-              <div className="text-[10px] font-medium uppercase tracking-wider text-blue-300/80">Хүлээгдэж буй</div>
-              <div className="text-xl tabular-nums font-bold text-blue-100">{expectedCount}</div>
+              <div className="text-[10px] font-medium uppercase tracking-wider text-blue-300/80">
+                Хүлээгдэж буй
+              </div>
+              <div className="text-xl tabular-nums font-bold text-blue-100">
+                {expectedCount}
+              </div>
             </div>
           </div>
         </div>
@@ -127,8 +148,12 @@ export function ChefDashboard() {
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
             </div>
             <div>
-              <div className="text-[10px] font-medium uppercase tracking-wider text-emerald-300/80">Идсэн</div>
-              <div className="text-xl tabular-nums font-bold text-emerald-100">{servedCount}</div>
+              <div className="text-[10px] font-medium uppercase tracking-wider text-emerald-300/80">
+                Идсэн
+              </div>
+              <div className="text-xl tabular-nums font-bold text-emerald-100">
+                {servedCount}
+              </div>
             </div>
           </div>
         </div>
@@ -141,8 +166,12 @@ export function ChefDashboard() {
               <Clock className="h-3.5 w-3.5 text-orange-400" />
             </div>
             <div>
-              <div className="text-[10px] font-medium uppercase tracking-wider text-orange-300/80">Үлдсэн</div>
-              <div className="text-xl tabular-nums font-bold text-orange-100">{remaining}</div>
+              <div className="text-[10px] font-medium uppercase tracking-wider text-orange-300/80">
+                Үлдсэн
+              </div>
+              <div className="text-xl tabular-nums font-bold text-orange-100">
+                {remaining}
+              </div>
             </div>
           </div>
         </div>
@@ -155,8 +184,12 @@ export function ChefDashboard() {
               <Hand className="h-3.5 w-3.5 text-violet-400" />
             </div>
             <div>
-              <div className="text-[10px] font-medium uppercase tracking-wider text-violet-300/80">Гараар</div>
-              <div className="text-xl tabular-nums font-bold text-violet-100">{manualCount}</div>
+              <div className="text-[10px] font-medium uppercase tracking-wider text-violet-300/80">
+                Гараар
+              </div>
+              <div className="text-xl tabular-nums font-bold text-violet-100">
+                {manualCount}
+              </div>
             </div>
           </div>
         </div>
@@ -169,8 +202,12 @@ export function ChefDashboard() {
               <Star className="h-3.5 w-3.5 text-amber-400" />
             </div>
             <div>
-              <div className="text-[10px] font-medium uppercase tracking-wider text-amber-300/80">Нэмэлт</div>
-              <div className="text-xl tabular-nums font-bold text-amber-100">{extraCount}</div>
+              <div className="text-[10px] font-medium uppercase tracking-wider text-amber-300/80">
+                Нэмэлт
+              </div>
+              <div className="text-xl tabular-nums font-bold text-amber-100">
+                {extraCount}
+              </div>
             </div>
           </div>
         </div>
@@ -181,15 +218,16 @@ export function ChefDashboard() {
         <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-slate-800/60">
           <div
             className="h-full rounded-full bg-gradient-to-r from-blue-500 via-blue-400 to-emerald-500 transition-all duration-500 shadow-[0_0_12px_rgba(59,130,246,0.4)]"
-            style={{ width: `${progressPercent}%` }}
-          >
+            style={{ width: `${progressPercent}%` }}>
             {/* Shimmer on progress */}
             <div className="absolute inset-0 overflow-hidden">
               <div className="animate-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
             </div>
           </div>
         </div>
-        <span className="text-xs tabular-nums text-slate-400">{progressPercent}%</span>
+        <span className="text-xs tabular-nums text-slate-400">
+          {progressPercent}%
+        </span>
       </div>
     </div>
   );

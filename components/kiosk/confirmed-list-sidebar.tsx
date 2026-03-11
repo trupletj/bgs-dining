@@ -11,12 +11,14 @@ import { KIOSK_CONFIG_KEYS } from "@/lib/constants";
 
 export function ConfirmedListSidebar() {
   const { currentMeal } = useCurrentMeal();
-  const { value: diningHallId } = useKioskConfig(KIOSK_CONFIG_KEYS.DINING_HALL_ID);
+  const { value: diningHallId } = useKioskConfig(
+    KIOSK_CONFIG_KEYS.DINING_HALL_ID,
+  );
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const { logs } = useMealLogs({
     date: today,
-    mealType: currentMeal?.id,
+    mealType: currentMeal?.mealType,
     diningHallId: diningHallId ? Number(diningHallId) : undefined,
   });
 
@@ -36,9 +38,7 @@ export function ConfirmedListSidebar() {
         {logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">
             <Users className="h-8 w-8 text-slate-600" />
-            <p className="text-sm text-slate-500">
-              Бүртгэл байхгүй
-            </p>
+            <p className="text-sm text-slate-500">Бүртгэл байхгүй</p>
           </div>
         ) : (
           <ul className="space-y-1.5 p-2">
@@ -46,8 +46,10 @@ export function ConfirmedListSidebar() {
               <li
                 key={log.id}
                 className="group relative flex items-start gap-3 overflow-hidden rounded-xl bg-slate-800/40 backdrop-blur-sm border border-white/5 px-3 py-2.5 transition-all duration-200 hover:bg-slate-800/60 hover:border-white/10 hover:shadow-[0_0_20px_-5px_rgba(59,130,246,0.1)] animate-in slide-in-from-right-5 fade-in-0 duration-300"
-                style={{ animationDelay: `${Math.min(index * 50, 500)}ms`, animationFillMode: "backwards" }}
-              >
+                style={{
+                  animationDelay: `${Math.min(index * 50, 500)}ms`,
+                  animationFillMode: "backwards",
+                }}>
                 {/* Shimmer effect on newest item */}
                 {index === 0 && (
                   <div className="pointer-events-none absolute inset-0 overflow-hidden">

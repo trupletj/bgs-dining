@@ -10,9 +10,10 @@ import { MEAL_TYPE_COLUMN_MAP } from "@/lib/constants";
  */
 export function getMealLocationForSlot(
   config: UserMealConfig,
-  slotId: string
+  slotId: string,
 ): number | null | "skip" {
   const columnName = MEAL_TYPE_COLUMN_MAP[slotId];
+  console.log("slotid", slotId);
 
   if (columnName === null || columnName === undefined) {
     // No dedicated column for this meal type (e.g., snack)

@@ -8,7 +8,7 @@ async function logSync(
   type: SyncLog["type"],
   status: SyncLog["status"],
   recordCount: number,
-  error?: string
+  error?: string,
 ): Promise<number | void> {
   return db.syncLog.add({
     type,
@@ -38,17 +38,20 @@ export async function pullEmployees(): Promise<number> {
     if (diningHallId) {
       // Get configs where ANY meal location matches this dining hall
       configQuery = configQuery.or(
-        `breakfast_location.eq.${diningHallId},lunch_location.eq.${diningHallId},dinner_location.eq.${diningHallId},night_meal_location.eq.${diningHallId},morning_meal_location.eq.${diningHallId}`
+        `breakfast_location.eq.${diningHallId},lunch_location.eq.${diningHallId},dinner_location.eq.${diningHallId},night_meal_location.eq.${diningHallId},morning_meal_location.eq.${diningHallId}`,
       );
     }
 
     const { data: configs, error: configError } = await configQuery;
-    if (configError) throw new Error(`user_meal_configs: ${configError.message}`);
+    if (configError)
+      throw new Error(`user_meal_configs: ${configError.message}`);
 
     const allConfigs = configs || [];
 
     // 2. Extract user IDs — merge default config users + override users
-    const defaultUserIds = allConfigs.map((c: { user_id: string }) => c.user_id);
+    const defaultUserIds = allConfigs.map(
+      (c: { user_id: string }) => c.user_id,
+    );
 
     // Also query meal_location_overrides for today pointing to this dining hall
     let overrideUserIds: string[] = [];
@@ -73,13 +76,19 @@ export async function pullEmployees(): Promise<number> {
         await db.userMealConfigs.clear();
       });
       if (typeof logId === "number") {
-        await db.syncLog.update(logId, { status: "success", recordCount: 0, completedAt: new Date().toISOString() });
+        await db.syncLog.update(logId, {
+          status: "success",
+          recordCount: 0,
+          completedAt: new Date().toISOString(),
+        });
       }
       return 0;
     }
 
     // Fetch configs for override-only users (they may not match default filter)
-    const overrideOnlyIds = overrideUserIds.filter((id) => !defaultUserIds.includes(id));
+    const overrideOnlyIds = overrideUserIds.filter(
+      (id) => !defaultUserIds.includes(id),
+    );
     if (overrideOnlyIds.length > 0) {
       for (let i = 0; i < overrideOnlyIds.length; i += 200) {
         const batch = overrideOnlyIds.slice(i, i + 200);
@@ -97,7 +106,9 @@ export async function pullEmployees(): Promise<number> {
       const batch = userIds.slice(i, i + 200);
       const { data: users, error: userError } = await supabase
         .from("users")
-        .select("id, bteg_id, idcard_number, first_name, last_name, nice_name, department_name, heltes_name, position_name, is_active")
+        .select(
+          "id, bteg_id, idcard_number, first_name, last_name, nice_name, department_name, heltes_name, position_name, is_active",
+        )
         .in("id", batch);
       if (userError) throw new Error(`users: ${userError.message}`);
       if (users) allUsers.push(...users);
@@ -108,7 +119,9 @@ export async function pullEmployees(): Promise<number> {
       id: u.id as string,
       employeeCode: (u.bteg_id as string) || "",
       idcardNumber: (u.idcard_number as string) || "",
-      name: (u.nice_name as string) || `${u.last_name || ""} ${u.first_name || ""}`.trim(),
+      name:
+        (u.nice_name as string) ||
+        `${u.last_name || ""} ${u.first_name || ""}`.trim(),
       department: (u.department_name as string) || "",
       position: (u.position_name as string) || "",
       heltesName: (u.heltes_name as string) || "",
@@ -207,7 +220,9 @@ export async function pullChefs(): Promise<number> {
 
   try {
     const supabase = await getSupabaseClient();
-    let query = supabase.from("chefs").select("id, name, dining_hall_id, pin, is_active");
+    let query = supabase
+      .from("chefs")
+      .select("id, name, phone, dining_hall_id, pin, is_active");
     if (diningHallId) {
       query = query.eq("dining_hall_id", diningHallId);
     }
@@ -218,6 +233,7 @@ export async function pullChefs(): Promise<number> {
     const mapped = (chefs || []).map((c: Record<string, unknown>) => ({
       id: c.id as number,
       name: (c.name as string) || "",
+      phone: (c.phone as string) || "",
       diningHallId: c.dining_hall_id as number,
       pin: (c.pin as string) || "0000",
       isActive: c.is_active !== false,
@@ -261,7 +277,11 @@ export async function pullMealLocationOverrides(): Promise<number> {
     if (localEmployeeIds.length === 0) {
       await db.mealLocationOverrides.clear();
       if (typeof logId === "number") {
-        await db.syncLog.update(logId, { status: "success", recordCount: 0, completedAt: new Date().toISOString() });
+        await db.syncLog.update(logId, {
+          status: "success",
+          recordCount: 0,
+          completedAt: new Date().toISOString(),
+        });
       }
       return 0;
     }
@@ -318,6 +338,88 @@ export async function pullMealLocationOverrides(): Promise<number> {
   }
 }
 
+export async function pullMealTimeSlots(): Promise<number> {
+  const logId = await logSync("pull-time-slots", "started", 0);
+
+  try {
+    const rawDiningHallId = await getDiningHallId();
+
+    const isInvalid =
+      !rawDiningHallId ||
+      String(rawDiningHallId) === "null" ||
+      String(rawDiningHallId) === "undefined";
+
+    if (isInvalid) {
+      console.warn(
+        "Sync: dining_hall_id олдсонгүй (эсвэл 'null' текст байна).",
+      );
+      if (typeof logId === "number") {
+        await db.syncLog.update(logId, {
+          status: "success",
+          recordCount: 0,
+          completedAt: new Date().toISOString(),
+          error: "Dining Hall ID is missing or stringified 'null'",
+        });
+      }
+      return 0;
+    }
+    const diningHallId = Number(rawDiningHallId);
+
+    if (isNaN(diningHallId)) {
+      throw new Error(`Invalid Dining Hall ID: ${rawDiningHallId}`);
+    }
+    const supabase = await getSupabaseClient();
+
+    // Зөвхөн өөрийн гал тогоонд хамаарах цагийн хуваарийг татна
+    let query = supabase
+      .from("meal_time_slots")
+      .select("*")
+      .eq("dining_hall_id", diningHallId)
+      .eq("is_active", true);
+    if (diningHallId) {
+      query = query.eq("dining_hall_id", diningHallId);
+    }
+
+    const { data: slots, error } = await query;
+    if (error) throw new Error(`meal_time_slots: ${error.message}`);
+    console.log("Fetched meal time slots:", slots);
+
+    const mapped = (slots || []).map((s: Record<string, unknown>) => ({
+      id: s.id as number,
+      diningHallId: s.dining_hall_id as number,
+      mealType: s.meal_type as string,
+      startTime: s.start_time as string,
+      endTime: s.end_time as string,
+      isActive: s.is_active !== false,
+      sortOrder: s.sort_order as number,
+    }));
+
+    await db.transaction("rw", db.mealTimeSlots, async () => {
+      await db.mealTimeSlots.clear();
+      await db.mealTimeSlots.bulkAdd(mapped);
+    });
+
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "success",
+        recordCount: mapped.length,
+        completedAt: new Date().toISOString(),
+      });
+    }
+
+    return mapped.length;
+  } catch (error) {
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "failed",
+        completedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    throw error;
+  }
+}
+
 export async function pushMealLogs(): Promise<number> {
   const pending = await db.mealLogs
     .where("syncStatus")
@@ -336,7 +438,8 @@ export async function pushMealLogs(): Promise<number> {
       const batch = pending.slice(i, i + BATCH_SIZE);
 
       const rows = batch.map((log) => ({
-        user_id: log.userId,
+        user_id: !log.userId || log.userId === "unknown" ? null : log.userId,
+        bteg_id: log.btegId || "",
         dining_hall_id: log.diningHallId,
         meal_type: log.mealType,
         scanned_at: log.scannedAt,
@@ -356,10 +459,7 @@ export async function pushMealLogs(): Promise<number> {
 
       // Mark batch as synced
       const ids = batch.map((l) => l.id!).filter(Boolean);
-      await db.mealLogs
-        .where("id")
-        .anyOf(ids)
-        .modify({ syncStatus: "synced" });
+      await db.mealLogs.where("id").anyOf(ids).modify({ syncStatus: "synced" });
 
       totalSynced += batch.length;
     }
@@ -411,6 +511,7 @@ export async function runFullSync(): Promise<{
   employeesPulled: number;
   hallsPulled: number;
   chefsPulled: number;
+  timeSlotsPulled: number;
   overridesPulled: number;
   logsPushed: number;
 }> {
@@ -418,6 +519,7 @@ export async function runFullSync(): Promise<{
     employeesPulled: 0,
     hallsPulled: 0,
     chefsPulled: 0,
+    timeSlotsPulled: 0,
     overridesPulled: 0,
     logsPushed: 0,
   };
@@ -439,6 +541,12 @@ export async function runFullSync(): Promise<{
     results.chefsPulled = await pullChefs();
   } catch (e) {
     console.error("Pull chefs failed:", e);
+  }
+
+  try {
+    results.timeSlotsPulled = await pullMealTimeSlots();
+  } catch (e) {
+    console.error("Pull time slots failed:", e);
   }
 
   try {

@@ -1,75 +1,69 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, type MealTimeSlot } from "@/lib/db";
+import { db } from "@/lib/db";
 
 function parseTime(timeStr: string): number {
-  const [h, m] = timeStr.split(":").map(Number);
+  if (!timeStr) return 0;
+  const parts = timeStr.split(":").map(Number);
+  const h = parts[0] || 0;
+  const m = parts[1] || 0;
   return h * 60 + m;
 }
-
 function getCurrentMinutes(): number {
   const now = new Date();
   return now.getHours() * 60 + now.getMinutes();
 }
 
-function findActiveMeal(slots: MealTimeSlot[]): MealTimeSlot | null {
-  const currentMinutes = getCurrentMinutes();
-
-  const activeSlots = slots
-    .filter((s) => s.isActive)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-
-  for (const slot of activeSlots) {
-    const start = parseTime(slot.startTime);
-    const end = parseTime(slot.endTime);
-
-    if (end > start) {
-      // Normal range (e.g., 11:30-13:30)
-      if (currentMinutes >= start && currentMinutes < end) {
-        return slot;
-      }
-    } else {
-      // Overnight range (e.g., 23:00-01:00)
-      if (currentMinutes >= start || currentMinutes < end) {
-        return slot;
-      }
-    }
-  }
-
-  return null;
-}
-
 export function useCurrentMeal() {
-  const mealSlots = useLiveQuery(() =>
-    db.mealTimeSlots.orderBy("sortOrder").toArray()
-  );
-
-  const [currentMeal, setCurrentMeal] = useState<MealTimeSlot | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  useEffect(() => {
-    if (mealSlots) {
-      setCurrentMeal(findActiveMeal(mealSlots));
-    }
-  }, [mealSlots]);
-
+  // 1. Цагийг секунд тутамд шинэчлэх (илүү нарийвчлалтай)
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-      if (mealSlots) {
-        setCurrentMeal(findActiveMeal(mealSlots));
-      }
-    }, 60_000); // re-evaluate every minute
-
+    }, 60000);
     return () => clearInterval(interval);
-  }, [mealSlots]);
+  }, []);
+
+  // 2. Баазаас цагийн хуваарийг унших
+  const mealSlots = useLiveQuery(() => db.mealTimeSlots.toArray());
+
+  // 3. Одоогийн хоолны цагийг тооцоолох
+  const currentMeal = useMemo(() => {
+    if (!mealSlots || mealSlots.length === 0) return null;
+
+    const currentMinutes =
+      currentTime.getHours() * 60 + currentTime.getMinutes();
+
+    // Зөвхөн идэвхтэй хуваарийг шүүх
+    const activeSlots = mealSlots.filter((s) => s.isActive);
+
+    for (const slot of activeSlots) {
+      const start = parseTime(slot.startTime);
+      const end = parseTime(slot.endTime);
+
+      if (end > start) {
+        // Хэвийн үе (жишээ нь: 11:30 - 13:30)
+        if (currentMinutes >= start && currentMinutes < end) {
+          return slot;
+        }
+      } else {
+        // Шөнийн хоол (жишээ нь: 23:00 - 01:00)
+        if (currentMinutes >= start || currentMinutes < end) {
+          return slot;
+        }
+      }
+    }
+    return null;
+  }, [mealSlots, currentTime]);
 
   return {
     currentMeal,
     currentTime,
     allSlots: mealSlots ?? [],
     isLoading: mealSlots === undefined,
+    mealType: currentMeal?.mealType || null, // Meal confirmation-д хэрэг болдог
   };
 }

@@ -3,9 +3,11 @@
 import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentMeal } from "@/hooks/use-current-meal";
+import { MEAL_NAME_MAP } from "@/lib/constants";
 
 export function CurrentMealDisplay() {
   const { currentMeal } = useCurrentMeal();
+  console.log("Current Meal:", currentMeal);
 
   if (!currentMeal) {
     return (
@@ -28,7 +30,9 @@ export function CurrentMealDisplay() {
         <Clock className="h-4 w-4 text-blue-400" />
       </div>
       <div className="relative">
-        <span className="font-semibold text-blue-200">{currentMeal.name}</span>
+        <span className="font-semibold text-blue-200">
+          {MEAL_NAME_MAP[currentMeal.mealType] || "Одоогийн хоол"}
+        </span>
         <span className="ml-2 text-sm text-slate-400">
           {currentMeal.startTime} - {currentMeal.endTime}
         </span>

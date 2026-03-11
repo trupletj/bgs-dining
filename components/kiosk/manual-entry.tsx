@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Search, CheckCircle2 } from "lucide-react";
+import { UserPlus, Search } from "lucide-react";
 import { toast } from "sonner";
 
 interface DuplicateInfo {
@@ -32,8 +32,12 @@ export function ManualEntry() {
   const [search, setSearch] = useState("");
   const [duplicate, setDuplicate] = useState<DuplicateInfo | null>(null);
   const { currentMeal } = useCurrentMeal();
-  const { value: diningHallId } = useKioskConfig(KIOSK_CONFIG_KEYS.DINING_HALL_ID);
-  const { value: activeChefId } = useKioskConfig(KIOSK_CONFIG_KEYS.ACTIVE_CHEF_ID);
+  const { value: diningHallId } = useKioskConfig(
+    KIOSK_CONFIG_KEYS.DINING_HALL_ID,
+  );
+  const { value: activeChefId } = useKioskConfig(
+    KIOSK_CONFIG_KEYS.ACTIVE_CHEF_ID,
+  );
   const { value: deviceUuid } = useKioskConfig(KIOSK_CONFIG_KEYS.DEVICE_UUID);
 
   const allEmployees = useLiveQuery(() => db.employees.toArray());
@@ -48,7 +52,7 @@ export function ManualEntry() {
           e.name.toLowerCase().includes(q) ||
           e.employeeCode.toLowerCase().includes(q) ||
           e.idcardNumber.toLowerCase().includes(q) ||
-          e.department.toLowerCase().includes(q)
+          e.department.toLowerCase().includes(q),
       )
       .slice(0, 50);
   }, [allEmployees, search]);
@@ -60,7 +64,11 @@ export function ManualEntry() {
     }
 
     const today = new Date().toISOString().split("T")[0];
-    const existing = await checkDuplicateMealLog(employee.id, currentMeal.id, today);
+    const existing = await checkDuplicateMealLog(
+      employee.id,
+      currentMeal.mealType,
+      today,
+    );
     if (existing) {
       setDuplicate({ employee, existingLog: existing });
       return;
@@ -68,9 +76,10 @@ export function ManualEntry() {
 
     await createMealLog({
       userId: employee.id,
+      btegId: employee.employeeCode,
       idcardNumber: employee.idcardNumber,
       employeeName: employee.name,
-      mealType: currentMeal.id,
+      mealType: currentMeal.mealType,
       diningHallId: Number(diningHallId),
       date: today,
       scannedAt: new Date().toISOString(),
@@ -92,11 +101,14 @@ export function ManualEntry() {
     const { employee } = duplicate;
     const today = new Date().toISOString().split("T")[0];
 
+    console.log("Adding extra serving for employee:", employee);
+
     await createMealLog({
       userId: employee.id,
+      btegId: employee.employeeCode,
       idcardNumber: employee.idcardNumber,
       employeeName: employee.name,
-      mealType: currentMeal.id,
+      mealType: currentMeal.mealType,
       diningHallId: Number(diningHallId),
       date: today,
       scannedAt: new Date().toISOString(),
@@ -149,18 +161,22 @@ export function ManualEntry() {
                   <button
                     key={emp.id}
                     onClick={() => handleSelect(emp)}
-                    className="flex w-full items-center gap-3 rounded-xl bg-slate-800/40 border border-white/5 px-4 py-3 text-left hover:bg-slate-700/40 hover:border-white/10 hover:shadow-sm transition-all duration-200"
-                  >
+                    className="flex w-full items-center gap-3 rounded-xl bg-slate-800/40 border border-white/5 px-4 py-3 text-left hover:bg-slate-700/40 hover:border-white/10 hover:shadow-sm transition-all duration-200">
                     <div className="flex-1">
-                      <p className="text-sm font-medium break-words text-slate-100">{emp.name}</p>
+                      <p className="text-sm font-medium break-words text-slate-100">
+                        {emp.name}
+                      </p>
                       <p className="text-xs text-slate-500 break-words">
                         {emp.idcardNumber} | {emp.department}
                       </p>
                     </div>
                     <Badge
                       variant={emp.isActive ? "default" : "secondary"}
-                      className={emp.isActive ? "shrink-0 bg-emerald-500/15 border-emerald-400/20 text-emerald-300" : "shrink-0 bg-slate-700/50 border-white/5 text-slate-400"}
-                    >
+                      className={
+                        emp.isActive
+                          ? "shrink-0 bg-emerald-500/15 border-emerald-400/20 text-emerald-300"
+                          : "shrink-0 bg-slate-700/50 border-white/5 text-slate-400"
+                      }>
                       {emp.isActive ? "Идэвхтэй" : "Идэвхгүй"}
                     </Badge>
                   </button>
@@ -174,10 +190,14 @@ export function ManualEntry() {
       {duplicate && (
         <DoubleScanModal
           open={true}
-          onClose={() => { setDuplicate(null); setOpen(false); setSearch(""); }}
+          onClose={() => {
+            setDuplicate(null);
+            setOpen(false);
+            setSearch("");
+          }}
           onAddExtraServing={handleAddExtraServing}
           employeeName={duplicate.employee.name}
-          mealName={currentMeal?.name ?? ""}
+          mealName={currentMeal?.mealType ?? ""}
           existingScanTime={duplicate.existingLog.scannedAt}
         />
       )}

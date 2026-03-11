@@ -24,14 +24,59 @@ export const KIOSK_CONFIG_KEYS = {
 } as const;
 
 export const DEFAULT_MEAL_SLOTS = [
-  { id: "morning_meal", name: "Өглөөний хоол", startTime: "05:00", endTime: "06:30", isActive: false, sortOrder: 0 },
-  { id: "breakfast", name: "Өглөөний цай", startTime: "07:00", endTime: "09:00", isActive: true, sortOrder: 1 },
-  { id: "lunch", name: "Өдрийн хоол", startTime: "11:30", endTime: "13:30", isActive: true, sortOrder: 2 },
-  { id: "snack", name: "Оройн цай", startTime: "15:00", endTime: "16:00", isActive: true, sortOrder: 3 },
-  { id: "dinner", name: "Оройн хоол", startTime: "17:30", endTime: "19:30", isActive: true, sortOrder: 4 },
-  { id: "nightmeal", name: "Шөнийн хоол", startTime: "23:00", endTime: "01:00", isActive: false, sortOrder: 5 },
+  {
+    id: "morning_meal",
+    name: "Өглөөний хоол",
+    startTime: "05:00",
+    endTime: "06:30",
+    isActive: false,
+    sortOrder: 0,
+  },
+  {
+    id: "breakfast",
+    name: "Өглөөний цай",
+    startTime: "07:00",
+    endTime: "09:00",
+    isActive: true,
+    sortOrder: 1,
+  },
+  {
+    id: "lunch",
+    name: "Өдрийн хоол",
+    startTime: "11:30",
+    endTime: "13:30",
+    isActive: true,
+    sortOrder: 2,
+  },
+  {
+    id: "snack",
+    name: "Оройн цай",
+    startTime: "15:00",
+    endTime: "16:00",
+    isActive: true,
+    sortOrder: 3,
+  },
+  {
+    id: "dinner",
+    name: "Оройн хоол",
+    startTime: "17:30",
+    endTime: "19:30",
+    isActive: true,
+    sortOrder: 4,
+  },
+  {
+    id: "nightmeal",
+    name: "Шөнийн хоол",
+    startTime: "23:00",
+    endTime: "01:00",
+    isActive: false,
+    sortOrder: 5,
+  },
 ] as const;
 
+export const MEAL_NAME_MAP = Object.fromEntries(
+  DEFAULT_MEAL_SLOTS.map((slot) => [slot.id, slot.name]),
+);
 /**
  * Maps local meal slot IDs to user_meal_configs column names.
  * `null` means skip per-meal validation (allow if user has any config).

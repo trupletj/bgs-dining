@@ -23,6 +23,7 @@ export interface UserMealConfig {
 
 export interface MealLog {
   id?: number;
+  btegId: string;
   userId: string; // uuid
   idcardNumber: string;
   employeeName: string;
@@ -39,8 +40,9 @@ export interface MealLog {
 }
 
 export interface MealTimeSlot {
-  id: string;
-  name: string;
+  id: number;
+  diningHallId: number;
+  mealType: string;
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   isActive: boolean;
@@ -56,6 +58,7 @@ export interface DiningHall {
 export interface Chef {
   id: number; // bigint from Supabase (not auto-increment locally)
   name: string;
+  phone: string;
   diningHallId: number;
   pin: string;
   isActive: boolean;
@@ -79,7 +82,14 @@ export interface KioskConfig {
 
 export interface SyncLog {
   id?: number;
-  type: "pull-employees" | "pull-dining-halls" | "pull-chefs" | "pull-overrides" | "push-meal-logs" | "heartbeat";
+  type:
+    | "pull-employees"
+    | "pull-dining-halls"
+    | "pull-chefs"
+    | "pull-overrides"
+    | "pull-time-slots"
+    | "push-meal-logs"
+    | "heartbeat";
   status: "started" | "success" | "failed";
   recordCount: number;
   startedAt: string;
@@ -101,6 +111,7 @@ class CanteenDB extends Dexie {
   constructor() {
     super(DB_NAME);
 
+    // v1: Анхны бүтэц
     this.version(1).stores({
       employees: "id, employeeCode, diningHallId, isActive",
       mealConfirmations:
@@ -112,14 +123,14 @@ class CanteenDB extends Dexie {
       syncLog: "++id, type, status, startedAt",
     });
 
-    // v2: Drop tables with changed primary keys (chefs: ++id → id)
-    // and old mealConfirmations. Dexie requires null to drop before recreate.
+    // v2: Chefs болон mealConfirmations-ийг устгах бэлтгэл
     this.version(2).stores({
       mealConfirmations: null,
       chefs: null,
     });
 
-    // v3: Recreate chefs with new PK, add new tables, update indexes
+    // v3: Шинэ бүтэц болон дата шилжүүлэг (Migration)
+    // ЭНЭ ХЭСГИЙГ ХЭВЭЭР ҮЛДЭЭНЭ
     this.version(3)
       .stores({
         employees: "id, employeeCode, idcardNumber, isActive",
@@ -133,22 +144,19 @@ class CanteenDB extends Dexie {
         syncLog: "++id, type, status, startedAt",
       })
       .upgrade(async (tx) => {
-        // Migrate mealConfirmations → mealLogs if any exist
-        // (mealConfirmations was dropped in v2 but data may have been
-        //  preserved by Dexie until this upgrade runs)
         try {
           const oldTable = tx.table("mealConfirmations");
           const oldRecords = await oldTable.toArray();
           if (oldRecords.length > 0) {
-            const newLogs = oldRecords.map((old: Record<string, unknown>) => ({
-              userId: old.employeeId as string,
-              idcardNumber: (old.employeeCode as string) || "",
-              employeeName: (old.employeeName as string) || "",
-              mealType: (old.mealSlotId as string) || "",
+            const newLogs = oldRecords.map((old: any) => ({
+              userId: old.employeeId,
+              idcardNumber: old.employeeCode || "",
+              employeeName: old.employeeName || "",
+              mealType: old.mealSlotId || "",
               diningHallId: Number(old.diningHallId) || 0,
-              date: (old.date as string) || "",
-              scannedAt: (old.confirmedAt as string) || new Date().toISOString(),
-              syncStatus: (old.syncStatus as string) === "synced" ? "synced" as const : "pending" as const,
+              date: old.date || "",
+              scannedAt: old.confirmedAt || new Date().toISOString(),
+              syncStatus: old.syncStatus === "synced" ? "synced" : "pending",
               isExtraServing: false,
               isManualOverride: false,
               chefId: null,
@@ -157,14 +165,29 @@ class CanteenDB extends Dexie {
             }));
             await tx.table("mealLogs").bulkAdd(newLogs);
           }
-        } catch {
-          // mealConfirmations already dropped, nothing to migrate
+        } catch (e) {
+          // mealConfirmations байхгүй бол алгасна
         }
       });
 
-    // v4: Add mealLocationOverrides table
+    // v4: Overrides нэмэх
     this.version(4).stores({
       mealLocationOverrides: "id, [userId+date+mealType], [date+diningHallId]",
+    });
+
+    this.version(5)
+      .stores({
+        mealTimeSlots: "++id, diningHallId, mealType, isActive, sortOrder",
+        chefs: "id, phone, diningHallId, isActive",
+      })
+      .upgrade(async (tx) => {
+        await tx.table("mealTimeSlots").clear();
+        await tx.table("chefs").clear();
+      });
+
+    this.version(6).stores({
+      mealTimeSlots: "++id, diningHallId, mealType, sortOrder, isActive",
+      chefs: "id, phone, diningHallId, isActive",
     });
   }
 }

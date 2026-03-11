@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Cloud, CloudOff, Database } from "lucide-react";
+import { Cloud, CloudOff, Database, Settings } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -10,11 +10,13 @@ import {
 } from "@/components/ui/tooltip";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { usePendingSyncCount } from "@/hooks/use-meal-logs";
+import { useRouter } from "next/navigation";
 
 export function HeartbeatIndicator() {
   const { isOnline } = useOnlineStatus();
   const pendingSync = usePendingSyncCount();
   const [storageUsage, setStorageUsage] = useState<string>("");
+  const router = useRouter();
 
   useEffect(() => {
     async function checkStorage() {
@@ -45,13 +47,15 @@ export function HeartbeatIndicator() {
               ) : (
                 <CloudOff className="h-4 w-4 text-red-500" />
               )}
-              <span className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ${
-                isOnline && synced
-                  ? "bg-green-500 animate-pulse"
-                  : isOnline && !synced
-                    ? "bg-yellow-500"
-                    : "bg-red-500"
-              }`} />
+              <span
+                className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ${
+                  isOnline && synced
+                    ? "bg-green-500 animate-pulse"
+                    : isOnline && !synced
+                      ? "bg-yellow-500"
+                      : "bg-red-500"
+                }`}
+              />
               {pendingSync > 0 && (
                 <span className="text-[10px] font-medium text-muted-foreground">
                   {pendingSync}
@@ -70,7 +74,7 @@ export function HeartbeatIndicator() {
         {storageUsage && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center">
                 <Database className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
             </TooltipTrigger>
@@ -79,6 +83,12 @@ export function HeartbeatIndicator() {
             </TooltipContent>
           </Tooltip>
         )}
+        <Tooltip>
+          <Settings
+            className="h-3.5 w-3.5 text-muted-foreground"
+            onClick={() => router.push("/setup")}
+          />
+        </Tooltip>
       </div>
     </TooltipProvider>
   );

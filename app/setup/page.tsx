@@ -1,15 +1,20 @@
-// /home/aagiihhz/bgs-dining/app/setup/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useKioskConfig } from "@/hooks/use-kiosk-config";
 import { KIOSK_CONFIG_KEYS } from "@/lib/constants";
-import { db } from "@/lib/db";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { runFullSync } from "@/lib/sync/sync-engine";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, Monitor, RefreshCw, CheckCircle } from "lucide-react";
+import {
+  Loader2,
+  Monitor,
+  RefreshCw,
+  CheckCircle,
+  ArrowLeft,
+} from "lucide-react";
+import Link from "next/link";
 
 export default function SmartSetupPage() {
   const { value: uuid } = useKioskConfig(KIOSK_CONFIG_KEYS.DEVICE_UUID);
@@ -59,6 +64,15 @@ export default function SmartSetupPage() {
   };
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-6">
+      <div className="absolute top-8 left-8">
+        <Link href="/">
+          <Button
+            variant="ghost"
+            className="text-slate-400 hover:text-white hover:bg-slate-900 transition-colors">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Буцах
+          </Button>
+        </Link>
+      </div>
       <div className="w-full max-w-md space-y-8 text-center">
         <div className="space-y-2">
           <Monitor className="w-12 h-12 mx-auto text-blue-500" />

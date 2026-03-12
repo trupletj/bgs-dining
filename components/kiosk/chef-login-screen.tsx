@@ -152,15 +152,6 @@ export function ChefLoginScreen() {
           )}
           Нэвтрэх
         </Button>
-
-        <Link href="/admin">
-          <Button
-            variant="ghost"
-            className="w-full gap-2 text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-all">
-            <Settings className="h-4 w-4" />
-            Админ тохиргоо
-          </Button>
-        </Link>
       </div>
     </div>
   );

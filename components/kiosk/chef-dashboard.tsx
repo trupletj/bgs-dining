@@ -20,6 +20,12 @@ export function ChefDashboard() {
   );
 
   const expected = useLiveQuery(async () => {
+    console.log(
+      "Calculating expected count for meal:",
+      currentMeal,
+      "and dining hall:",
+      diningHallId,
+    );
     if (!currentMeal || !diningHallId) return 0;
 
     const hallId = Number(diningHallId);

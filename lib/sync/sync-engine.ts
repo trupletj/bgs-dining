@@ -4,6 +4,16 @@ import { KIOSK_CONFIG_KEYS } from "@/lib/constants";
 
 const BATCH_SIZE = 100;
 
+export type SyncResults = {
+  employeesPulled: number;
+  hallsPulled: number;
+  chefsPulled: number;
+  timeSlotsPulled: number;
+  overridesPulled: number;
+  logsPushed: number;
+  isOffline?: boolean;
+};
+
 async function logSync(
   type: SyncLog["type"],
   status: SyncLog["status"],
@@ -172,17 +182,15 @@ async function getDiningHallId(): Promise<number | null> {
 // }
 
 export async function pullEmployees(): Promise<number> {
+  if (!navigator.onLine) return 0;
   const logId = await logSync("pull-employees", "started", 0);
   const diningHallId = await getDiningHallId();
 
   try {
     const supabase = await getSupabaseClient();
 
-    // 1. View-ээс датаг татах
-    // View нь INNER JOIN ашиглаж байгаа тул зөвхөн ажиллаж буй хүмүүс ирнэ
     let query = supabase.from("users_with_stats").select("*");
 
-    // 2. Тухайн гал тогоонд хамааралтай хүмүүсийг шүүх (Config-оор)
     if (diningHallId) {
       query = query.or(
         `breakfast_location.eq.${diningHallId},lunch_location.eq.${diningHallId},dinner_location.eq.${diningHallId},night_meal_location.eq.${diningHallId},morning_meal_location.eq.${diningHallId}`,
@@ -190,7 +198,11 @@ export async function pullEmployees(): Promise<number> {
     }
 
     const { data: allData, error } = await query;
-    if (error) throw new Error(`users_with_stats error: ${error.message}`);
+    if (error) throw error;
+    if (!allData || allData.length === 0) {
+      console.warn("No data returned from server, keeping local data.");
+      return 0;
+    }
 
     const employees: Employee[] = (allData || []).map((row) => ({
       id: row.user_id,
@@ -337,13 +349,13 @@ export async function pullChefs(): Promise<number> {
 }
 
 export async function pullMealLocationOverrides(): Promise<number> {
+  if (!navigator.onLine) return 0;
   const logId = await logSync("pull-overrides", "started", 0);
 
   try {
     const supabase = await getSupabaseClient();
     const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
 
-    // 1. Өнөөдрийн бүх идэвхтэй override-уудыг татах
     const { data: allOverrides, error } = await supabase
       .from("meal_location_overrides")
       .select("id, user_id, bteg_id, date, meal_type, dining_hall_id, note")
@@ -352,6 +364,11 @@ export async function pullMealLocationOverrides(): Promise<number> {
 
     if (error)
       throw new Error(`meal_location_overrides error: ${error.message}`);
+
+    if (!allOverrides || allOverrides.length === 0) {
+      console.warn("No data returned from server, keeping local data.");
+      return 0;
+    }
 
     const mappedOverrides = (allOverrides || []).map((o) => ({
       id: o.id as number,
@@ -397,12 +414,14 @@ export async function pullMealLocationOverrides(): Promise<number> {
     }
 
     // 3. Override мэдээллүүдийг локал баазад хадгалах
-    await db.transaction("rw", db.mealLocationOverrides, async () => {
-      await db.mealLocationOverrides.clear();
-      if (mappedOverrides.length > 0) {
+    if (mappedOverrides.length > 0) {
+      await db.transaction("rw", db.mealLocationOverrides, async () => {
+        await db.mealLocationOverrides.clear();
         await db.mealLocationOverrides.bulkAdd(mappedOverrides);
-      }
-    });
+      });
+    } else {
+      console.log("No overrides found on server, keeping local.");
+    }
 
     if (typeof logId === "number") {
       await db.syncLog.update(logId, {
@@ -667,14 +686,7 @@ export async function sendHeartbeat(): Promise<void> {
   }
 }
 
-export async function runFullSync(): Promise<{
-  employeesPulled: number;
-  hallsPulled: number;
-  chefsPulled: number;
-  timeSlotsPulled: number;
-  overridesPulled: number;
-  logsPushed: number;
-}> {
+export async function runFullSync(): Promise<SyncResults> {
   const results = {
     employeesPulled: 0,
     hallsPulled: 0,
@@ -683,8 +695,50 @@ export async function runFullSync(): Promise<{
     overridesPulled: 0,
     logsPushed: 0,
   };
+  if (!navigator.onLine) {
+    console.warn("Sync: Интернет холболтгүй тул шинэчлэл хийгдсэнгүй.");
+    return { ...results, isOffline: true };
+  }
 
-  // Push first (protect local data)
+  try {
+    const uuidConfig = await db.kioskConfig.get(KIOSK_CONFIG_KEYS.DEVICE_UUID);
+    const hallIdConfig = await db.kioskConfig.get(
+      KIOSK_CONFIG_KEYS.DINING_HALL_ID,
+    );
+
+    if (!uuidConfig?.value) {
+      console.warn("Sync skipped: Device UUID not found.");
+      return results;
+    }
+
+    const supabase = await getSupabaseClient();
+    const { data: kiosk, error: kioskError } = await supabase
+      .from("kiosks")
+      .select("is_active, dining_hall_id")
+      .eq("device_uuid", uuidConfig.value)
+      .single();
+
+    if (kioskError) {
+      console.error(
+        "Sync: Auth check failed due to network/server error. Skipping sync...",
+        kioskError,
+      );
+      return results;
+    }
+
+    if (hallIdConfig?.value) {
+      if (kioskError || !kiosk || !kiosk.is_active) {
+        await db.kioskConfig.delete(KIOSK_CONFIG_KEYS.DINING_HALL_ID);
+        window.location.href = "/setup";
+        throw new Error("UNAUTHORIZED_DEVICE");
+      }
+    } else {
+      return results;
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message === "UNAUTHORIZED_DEVICE") throw e;
+    return results;
+  }
   try {
     results.logsPushed = await pushMealLogs();
   } catch (e) {
@@ -714,15 +768,11 @@ export async function runFullSync(): Promise<{
   } catch (e) {
     console.error("Pull employees failed:", e);
   }
-
-  // Pull overrides after employees (needs employee list populated)
   try {
     results.overridesPulled = await pullMealLocationOverrides();
   } catch (e) {
     console.error("Pull meal location overrides failed:", e);
   }
-
-  // Non-critical heartbeat
   await sendHeartbeat();
 
   return results;

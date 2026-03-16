@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Search } from "lucide-react";
+import { UserPlus, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface DuplicateInfo {
@@ -32,7 +32,7 @@ export function ManualEntry() {
   const [search, setSearch] = useState("");
   const [duplicate, setDuplicate] = useState<DuplicateInfo | null>(null);
   const { currentMeal } = useCurrentMeal();
-  const { value: diningHallId } = useKioskConfig(
+  const { value: diningHallId, isLoading } = useKioskConfig(
     KIOSK_CONFIG_KEYS.DINING_HALL_ID,
   );
   const { value: activeChefId } = useKioskConfig(
@@ -59,6 +59,12 @@ export function ManualEntry() {
   }, [allEmployees, search]);
 
   const handleSelect = async (employee: Employee) => {
+    console.log(
+      "current meal in manual entry:",
+      currentMeal,
+      "and dining hall:",
+      diningHallId,
+    );
     if (!currentMeal || !diningHallId) {
       toast.error("Хоолны цаг эсвэл гал тогоо тохируулаагүй");
       return;

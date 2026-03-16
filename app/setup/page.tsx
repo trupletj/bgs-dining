@@ -24,7 +24,6 @@ export default function SmartSetupPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<"idle" | "linked" | "unlinked">("idle");
 
-  // 1. Cloud-аас энэ төхөөрөмжийн мэдээллийг татаж шалгах
   const checkConnection = async () => {
     if (!uuid) return;
     setLoading(true);

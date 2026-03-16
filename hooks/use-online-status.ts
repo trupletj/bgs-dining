@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, createContext, useContext } from "react";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { useState, useEffect, createContext, useContext } from "react";
 
 interface OnlineStatusContextValue {
   isOnline: boolean;
@@ -32,5 +33,23 @@ export function useOnlineStatusProvider() {
 }
 
 export function useOnlineStatus() {
-  return useContext(OnlineStatusContext);
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof window !== "undefined" ? navigator.onLine : true,
+  );
+
+  useEffect(() => {
+    const handleStatusChange = () => {
+      setIsOnline(navigator.onLine);
+    };
+
+    window.addEventListener("online", handleStatusChange);
+    window.addEventListener("offline", handleStatusChange);
+
+    return () => {
+      window.removeEventListener("online", handleStatusChange);
+      window.removeEventListener("offline", handleStatusChange);
+    };
+  }, []);
+
+  return { isOnline };
 }

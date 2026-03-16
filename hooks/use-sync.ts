@@ -35,6 +35,11 @@ export function useSync() {
   // }, [state]);
 
   const sync = useCallback(async () => {
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      console.log("Offline mode: Using local cached data.");
+      return;
+    }
+    if (window.location.pathname === "/setup") return;
     let isAlreadySyncing = false;
     setState((prev) => {
       if (prev === "syncing") {
@@ -50,11 +55,17 @@ export function useSync() {
 
     try {
       const results = await runFullSync();
-      setState("success");
-      setTimeout(() => setState("idle"), 3000);
+      if (results.isOffline) {
+        setState("idle"); // Амжилттай гэж харуулах хэрэггүй
+        return;
+      } else {
+        setState("success");
+        setTimeout(() => setState("idle"), 3000);
+      }
       return results;
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Sync failed";
+      console.error("Sync error:", msg);
       setLastError(msg);
       setState("error");
       setTimeout(() => setState("idle"), 5000);

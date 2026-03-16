@@ -52,7 +52,8 @@ export function ManualEntry() {
           e.name.toLowerCase().includes(q) ||
           e.employeeCode.toLowerCase().includes(q) ||
           e.idcardNumber.toLowerCase().includes(q) ||
-          e.department.toLowerCase().includes(q),
+          e.department.toLowerCase().includes(q) ||
+          (e.phone && e.phone.includes(q)),
       )
       .slice(0, 50);
   }, [allEmployees, search]);
@@ -153,7 +154,7 @@ export function ManualEntry() {
           <ScrollArea className="h-[400px]">
             {filtered.length === 0 ? (
               <p className="py-8 text-center text-sm text-slate-500">
-                {search ? "Олдсонгүй" : "Ажилтан ачааллаж байна..."}
+                {search ? "Олдсонгүй" : "Ажилтан ачаалж байна..."}
               </p>
             ) : (
               <div className="space-y-1 pr-3">
@@ -169,6 +170,11 @@ export function ManualEntry() {
                       <p className="text-xs text-slate-500 break-words">
                         {emp.idcardNumber} | {emp.department}
                       </p>
+                      {emp.phone && (
+                        <p className="text-[10px] text-blue-400/70 font-mono mt-0.5">
+                          Утас: {emp.phone}
+                        </p>
+                      )}
                     </div>
                     <Badge
                       variant={emp.isActive ? "default" : "secondary"}

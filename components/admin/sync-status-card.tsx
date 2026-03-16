@@ -14,16 +14,21 @@ import { toast } from "sonner";
 export function SyncStatusCard() {
   const { state, lastError, sync, syncEmployees, syncMealLogs } = useSync();
   const { value: supabaseUrl } = useKioskConfig(KIOSK_CONFIG_KEYS.SUPABASE_URL);
-  const { value: lastEmployeeSync } = useKioskConfig(KIOSK_CONFIG_KEYS.LAST_EMPLOYEE_SYNC);
-  const { value: lastConfirmationSync } = useKioskConfig(KIOSK_CONFIG_KEYS.LAST_CONFIRMATION_SYNC);
+  const { value: lastEmployeeSync } = useKioskConfig(
+    KIOSK_CONFIG_KEYS.LAST_EMPLOYEE_SYNC,
+  );
+  const { value: lastConfirmationSync } = useKioskConfig(
+    KIOSK_CONFIG_KEYS.LAST_CONFIRMATION_SYNC,
+  );
   const { value: deviceUuid } = useKioskConfig(KIOSK_CONFIG_KEYS.DEVICE_UUID);
 
-  const pendingCount = useLiveQuery(
-    () => db.mealLogs.where("syncStatus").equals("pending").count()
-  ) ?? 0;
+  const pendingCount =
+    useLiveQuery(() =>
+      db.mealLogs.where("syncStatus").equals("pending").count(),
+    ) ?? 0;
 
   const recentLogs = useLiveQuery(() =>
-    db.syncLog.orderBy("startedAt").reverse().limit(5).toArray()
+    db.syncLog.orderBy("startedAt").reverse().limit(5).toArray(),
   );
 
   const isSyncing = state === "syncing";
@@ -33,7 +38,7 @@ export function SyncStatusCard() {
       const results = await sync();
       if (results) {
         toast.success(
-          `Синк амжилттай: ${results.employeesPulled} ажилтан, ${results.logsPushed} бүртгэл`
+          `Синк амжилттай: ${results.employeesPulled} ажилтан, ${results.logsPushed} бүртгэл`,
         );
       }
     } catch {
@@ -76,8 +81,7 @@ export function SyncStatusCard() {
                 : state === "error"
                   ? "destructive"
                   : "outline"
-            }
-          >
+            }>
             {state === "syncing"
               ? "Синк хийж байна..."
               : state === "success"
@@ -98,14 +102,18 @@ export function SyncStatusCard() {
           </div>
           <div className="flex justify-between border-b border-border/30 pb-2">
             <span className="text-muted-foreground">Төхөөрөмж UUID</span>
-            <span className="font-mono text-xs truncate max-w-[180px]">{deviceUuid || "—"}</span>
+            <span className="font-mono text-xs truncate max-w-[180px]">
+              {deviceUuid || "—"}
+            </span>
           </div>
           <div className="flex justify-between border-b border-border/30 pb-2">
             <span className="text-muted-foreground">Сүүлд ажилтан татсан</span>
             <span>{formatDate(lastEmployeeSync)}</span>
           </div>
           <div className="flex justify-between border-b border-border/30 pb-2">
-            <span className="text-muted-foreground">Сүүлд бүртгэл илгээсэн</span>
+            <span className="text-muted-foreground">
+              Сүүлд бүртгэл илгээсэн
+            </span>
             <span>{formatDate(lastConfirmationSync)}</span>
           </div>
           <div className="flex justify-between">
@@ -114,12 +122,13 @@ export function SyncStatusCard() {
           </div>
         </div>
 
-        {lastError && (
-          <p className="text-sm text-destructive">{lastError}</p>
-        )}
+        {lastError && <p className="text-sm text-destructive">{lastError}</p>}
 
         <div className="flex flex-wrap gap-2">
-          <Button onClick={handleFullSync} disabled={isSyncing} className="gap-2">
+          <Button
+            onClick={handleFullSync}
+            disabled={isSyncing}
+            className="gap-2">
             {isSyncing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -130,15 +139,13 @@ export function SyncStatusCard() {
           <Button
             variant="outline"
             onClick={handleSyncEmployees}
-            disabled={isSyncing}
-          >
+            disabled={isSyncing}>
             Ажилтан татах
           </Button>
           <Button
             variant="outline"
             onClick={handlePushLogs}
-            disabled={isSyncing}
-          >
+            disabled={isSyncing}>
             Бүртгэл илгээх ({pendingCount})
           </Button>
         </div>
@@ -149,8 +156,7 @@ export function SyncStatusCard() {
             {recentLogs.map((log) => (
               <div
                 key={log.id}
-                className="flex items-center justify-between rounded-lg bg-muted/30 border px-2 py-1 text-xs"
-              >
+                className="flex items-center justify-between rounded-lg bg-muted/30 border px-2 py-1 text-xs">
                 <span>{log.type}</span>
                 <span>{log.recordCount} бичлэг</span>
                 <Badge
@@ -160,8 +166,7 @@ export function SyncStatusCard() {
                       : log.status === "failed"
                         ? "destructive"
                         : "outline"
-                  }
-                >
+                  }>
                   {log.status}
                 </Badge>
               </div>

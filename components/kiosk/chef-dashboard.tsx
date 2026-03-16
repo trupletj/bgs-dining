@@ -14,58 +14,53 @@ export function ChefDashboard() {
     KIOSK_CONFIG_KEYS.DINING_HALL_ID,
   );
 
-  // Reactive today — updates when currentTime changes (every 60s via useCurrentMeal)
   const today = useMemo(
     () => currentTime.toISOString().split("T")[0],
     [currentTime],
   );
 
-  // Expected: default config count + incoming overrides - outgoing overrides
   const expected = useLiveQuery(async () => {
     if (!currentMeal || !diningHallId) return 0;
 
     const hallId = Number(diningHallId);
     const columnName = MEAL_TYPE_COLUMN_MAP[currentMeal.mealType];
+    const todayStr = today; // Гаднаас ирж буй өнөөдрийн огноо
 
     let defaultCount: number;
-    if (columnName === null || columnName === undefined) {
-      // For snack: count all users with any config
+    if (!columnName) {
       defaultCount = await db.userMealConfigs.count();
     } else {
-      // Filter configs where the specific meal location matches this dining hall
-      const configs = await db.userMealConfigs.toArray();
-      defaultCount = configs.filter((c) => {
-        const value = c[columnName as keyof typeof c];
-        return value === hallId;
-      }).length;
+      defaultCount = await db.userMealConfigs
+        .where(columnName)
+        .equals(hallId)
+        .count();
     }
 
     const incoming = await db.mealLocationOverrides
       .where("[date+diningHallId]")
-      .equals([today, hallId])
+      .equals([todayStr, hallId])
       .filter((o) => o.mealType === currentMeal.mealType)
       .count();
 
     let outgoing = 0;
-    if (columnName !== null && columnName !== undefined) {
-      const allOverrides = await db.mealLocationOverrides.toArray();
-      const todayOverrides = allOverrides.filter(
-        (o) =>
-          o.date === today &&
-          o.mealType === currentMeal.mealType &&
-          o.diningHallId !== hallId,
-      );
+    if (columnName) {
+      const awayOverrides = await db.mealLocationOverrides
+        .where("date")
+        .equals(todayStr)
+        .filter(
+          (o) =>
+            o.mealType === currentMeal.mealType && o.diningHallId !== hallId,
+        )
+        .toArray();
 
-      if (todayOverrides.length > 0) {
-        const overriddenUserIds = todayOverrides.map((o) => o.userId);
-        const configs = await db.userMealConfigs
+      if (awayOverrides.length > 0) {
+        const overriddenUserIds = awayOverrides.map((o) => o.userId);
+
+        outgoing = await db.userMealConfigs
           .where("userId")
           .anyOf(overriddenUserIds)
-          .toArray();
-        outgoing = configs.filter((c) => {
-          const value = c[columnName as keyof typeof c];
-          return value === hallId;
-        }).length;
+          .and((config) => config[columnName as keyof typeof config] === hallId)
+          .count();
       }
     }
 
@@ -76,7 +71,9 @@ export function ChefDashboard() {
   const counts = useLiveQuery(async () => {
     if (!currentMeal || !diningHallId)
       return { served: 0, manual: 0, extra: 0 };
+
     const hallId = Number(diningHallId);
+
     const logs = await db.mealLogs
       .where("date")
       .equals(today)
@@ -85,13 +82,16 @@ export function ChefDashboard() {
       )
       .toArray();
 
-    let manual = 0;
-    let extra = 0;
-    for (const l of logs) {
-      if (l.isManualOverride) manual++;
-      if (l.isExtraServing) extra++;
-    }
-    return { served: logs.length, manual, extra };
+    // Reduce ашиглан нэг удаагийн давталтаар тооцох
+    return logs.reduce(
+      (acc, log) => {
+        acc.served++;
+        if (log.isManualOverride) acc.manual++;
+        if (log.isExtraServing) acc.extra++;
+        return acc;
+      },
+      { served: 0, manual: 0, extra: 0 },
+    );
   }, [currentMeal?.id, diningHallId, today]);
 
   const expectedCount = expected ?? 0;

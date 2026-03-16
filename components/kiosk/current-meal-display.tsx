@@ -7,7 +7,6 @@ import { MEAL_NAME_MAP } from "@/lib/constants";
 
 export function CurrentMealDisplay() {
   const { currentMeal } = useCurrentMeal();
-  console.log("Current Meal:", currentMeal);
 
   if (!currentMeal) {
     return (
@@ -19,10 +18,10 @@ export function CurrentMealDisplay() {
   }
 
   return (
-    <div className="relative flex items-center gap-3 overflow-hidden rounded-xl bg-gradient-to-r from-blue-500/20 via-blue-500/15 to-purple-500/20 border border-blue-400/30 px-4 py-2.5 shadow-lg">
+    <div className="relative flex items-center gap-3 overflow-hidden rounded-xl  from-blue-500/20 via-blue-500/15 to-purple-500/20 border border-blue-400/30 px-4 py-2.5 shadow-lg">
       {/* Shimmer effect */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="animate-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+        <div className="animate-shimmer absolute inset-0 from-transparent via-white/5 to-transparent" />
       </div>
       {/* Glow blob */}
       <div className="pointer-events-none absolute -left-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-blue-500/30 blur-xl" />

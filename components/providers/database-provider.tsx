@@ -18,7 +18,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   if (!isReady) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p className="text-muted-foreground">Ачааллаж байна...</p>
+        <p className="text-muted-foreground">Ачаалж байна...</p>
       </div>
     );
   }

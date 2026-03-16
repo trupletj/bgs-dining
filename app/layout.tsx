@@ -42,12 +42,10 @@ export default function RootLayout({
     <html lang="mn">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+        suppressHydrationWarning={true}>
         <OnlineStatusProvider>
           <DatabaseProvider>
-            <SyncProvider>
-              {children}
-            </SyncProvider>
+            <SyncProvider>{children}</SyncProvider>
             <Toaster position="top-right" />
           </DatabaseProvider>
         </OnlineStatusProvider>

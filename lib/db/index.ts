@@ -5,6 +5,7 @@ export interface Employee {
   id: string; // uuid from Supabase users.id
   employeeCode: string; // bteg_id
   idcardNumber: string; // idcard_number - primary lookup field
+  phone: string;
   name: string;
   department: string;
   position: string;
@@ -134,7 +135,8 @@ class CanteenDB extends Dexie {
     this.version(3)
       .stores({
         employees: "id, employeeCode, idcardNumber, isActive",
-        userMealConfigs: "userId",
+        userMealConfigs:
+          "userId, breakfastLocation, lunchLocation, dinnerLocation, nightMealLocation, morningMealLocation",
         mealLogs:
           "++id, [userId+mealType+date], idcardNumber, mealType, date, diningHallId, syncStatus, scannedAt, syncKey",
         mealTimeSlots: "id, sortOrder, isActive",
@@ -172,7 +174,8 @@ class CanteenDB extends Dexie {
 
     // v4: Overrides нэмэх
     this.version(4).stores({
-      mealLocationOverrides: "id, [userId+date+mealType], [date+diningHallId]",
+      mealLocationOverrides:
+        "id, userId, date, [userId+date+mealType], [date+diningHallId], [date+mealType]",
     });
 
     this.version(5)
@@ -188,6 +191,9 @@ class CanteenDB extends Dexie {
     this.version(6).stores({
       mealTimeSlots: "++id, diningHallId, mealType, sortOrder, isActive",
       chefs: "id, phone, diningHallId, isActive",
+    });
+    this.version(7).stores({
+      employees: "id, employeeCode, idcardNumber, phone, isActive",
     });
   }
 }

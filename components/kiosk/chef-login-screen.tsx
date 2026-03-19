@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useChefAuth } from "@/hooks/use-chef-auth";
 import { toast } from "sonner";
-import Link from "next/link";
 
 export function ChefLoginScreen() {
   const [phone, setPhone] = useState("");

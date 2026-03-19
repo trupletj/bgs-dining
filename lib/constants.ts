@@ -1,3 +1,5 @@
+import { Employee } from "./db";
+
 export const APP_NAME = "Canteen Kiosk";
 export const DB_NAME = "canteen-kiosk-db";
 export const DB_VERSION = 3;
@@ -72,6 +74,22 @@ export const DEFAULT_MEAL_SLOTS = [
     isActive: false,
     sortOrder: 5,
   },
+  {
+    id: "extend_morning_meal",
+    name: "Өглөөний хоол (сунасан)",
+    startTime: "23:00",
+    endTime: "01:00",
+    isActive: false,
+    sortOrder: 5,
+  },
+  {
+    id: "extend_lunch",
+    name: "Өдрийн хоол (сунасан)",
+    startTime: "23:00",
+    endTime: "01:00",
+    isActive: false,
+    sortOrder: 5,
+  },
 ] as const;
 
 export const MEAL_NAME_MAP = Object.fromEntries(
@@ -95,3 +113,87 @@ export const CONFIRMATION_DISPLAY_DURATION_MS = 4000;
 export const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 export const HEARTBEAT_INTERVAL_MS = 60 * 1000; // 1 minute
 export const DEFAULT_ADMIN_PIN = "1234";
+
+export function getAllowedMealTypesForShift(
+  shiftStartStr: string,
+  shiftEndStr: string,
+): string[] {
+  if (!shiftStartStr || !shiftEndStr) return [];
+
+  const startHour = extractHour(shiftStartStr);
+  const endHour = extractHour(shiftEndStr);
+
+  console.log(`Parsed Hours -> Start: ${startHour}, End: ${endHour}`);
+
+  // 1. Өдрийн ээлж: 07/08 - 19/20
+  if (
+    (startHour === 7 || startHour === 8) &&
+    (endHour === 19 || endHour === 20)
+  ) {
+    return ["breakfast", "lunch", "dinner"];
+  }
+
+  // 2. Шөнийн ээлж: 19/20 - 07/08
+  if (
+    (startHour === 19 || startHour === 20) &&
+    (endHour === 7 || endHour === 8)
+  ) {
+    return ["dinner", "night_meal", "morning_meal"];
+  }
+
+  // 3. Өглөөний хагас: 07/08 - 12
+  if ((startHour === 7 || startHour === 8) && endHour === 12) {
+    return ["breakfast", "lunch"];
+  }
+
+  // 4. Шөнийн уртасгасан ээлж (19/20 - 12)
+  if ((startHour === 19 || startHour === 20) && endHour === 12) {
+    return ["dinner", "night_meal", "extend_morning_meal", "extend_lunch"];
+  }
+  console.warn("No shift match found for hours:", startHour, endHour);
+  return [];
+}
+
+export const resolveMealTypeForEmployee = (
+  employee: Employee | null,
+  baseMealType: string,
+) => {
+  if (!employee) return baseMealType;
+
+  const allowedMeals = getAllowedMealTypesForShift(
+    employee.shiftStart,
+    employee.shiftEnd,
+  );
+  let targetMealType = baseMealType;
+
+  if (!allowedMeals.includes(targetMealType)) {
+    if (
+      targetMealType === "lunch" &&
+      allowedMeals.includes("extend_morning_meal")
+    ) {
+      targetMealType = "extend_morning_meal";
+    } else if (
+      targetMealType === "dinner" &&
+      allowedMeals.includes("extend_lunch")
+    ) {
+      targetMealType = "extend_lunch";
+    } else if (
+      targetMealType === "breakfast" &&
+      allowedMeals.includes("morning_meal")
+    ) {
+      targetMealType = "morning_meal";
+    }
+  }
+  return targetMealType;
+};
+
+function extractHour(dateStr: string): number {
+  if (!dateStr) return -1;
+
+  if (dateStr.includes("T")) {
+    const timePart = dateStr.split("T")[1];
+    return parseInt(timePart.split(":")[0], 10);
+  }
+
+  return parseInt(dateStr.split(":")[0], 10);
+}

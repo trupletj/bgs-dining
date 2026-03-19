@@ -35,152 +35,6 @@ async function getDiningHallId(): Promise<number | null> {
   return config?.value ? Number(config.value) : null;
 }
 
-// export async function pullEmployees(): Promise<number> {
-//   const logId = await logSync("pull-employees", "started", 0);
-//   const diningHallId = await getDiningHallId();
-
-//   try {
-//     const supabase = await getSupabaseClient();
-
-//     // 1. Get user_meal_configs filtered by this dining hall
-//     let configQuery = supabase.from("user_meal_configs").select("*");
-
-//     if (diningHallId) {
-//       // Get configs where ANY meal location matches this dining hall
-//       configQuery = configQuery.or(
-//         `breakfast_location.eq.${diningHallId},lunch_location.eq.${diningHallId},dinner_location.eq.${diningHallId},night_meal_location.eq.${diningHallId},morning_meal_location.eq.${diningHallId}`,
-//       );
-//     }
-
-//     const { data: configs, error: configError } = await configQuery;
-//     if (configError)
-//       throw new Error(`user_meal_configs: ${configError.message}`);
-
-//     const allConfigs = configs || [];
-
-//     // 2. Extract user IDs — merge default config users + override users
-//     const defaultUserIds = allConfigs.map(
-//       (c: { user_id: string }) => c.user_id,
-//     );
-
-//     // Also query meal_location_overrides for today pointing to this dining hall
-//     let overrideUserIds: string[] = [];
-//     if (diningHallId) {
-//       const today = new Date().toISOString().split("T")[0];
-//       const { data: overrides } = await supabase
-//         .from("meal_location_overrides")
-//         .select("user_id")
-//         .eq("date", today)
-//         .eq("dining_hall_id", diningHallId);
-//       if (overrides) {
-//         overrideUserIds = overrides.map((o: { user_id: string }) => o.user_id);
-//       }
-//     }
-
-//     const userIds = [...new Set([...defaultUserIds, ...overrideUserIds])];
-
-//     if (userIds.length === 0) {
-//       // No default configs and no overrides — clear local and return
-//       await db.transaction("rw", db.employees, db.userMealConfigs, async () => {
-//         await db.employees.clear();
-//         await db.userMealConfigs.clear();
-//       });
-//       if (typeof logId === "number") {
-//         await db.syncLog.update(logId, {
-//           status: "success",
-//           recordCount: 0,
-//           completedAt: new Date().toISOString(),
-//         });
-//       }
-//       return 0;
-//     }
-
-//     // Fetch configs for override-only users (they may not match default filter)
-//     const overrideOnlyIds = overrideUserIds.filter(
-//       (id) => !defaultUserIds.includes(id),
-//     );
-//     if (overrideOnlyIds.length > 0) {
-//       for (let i = 0; i < overrideOnlyIds.length; i += 200) {
-//         const batch = overrideOnlyIds.slice(i, i + 200);
-//         const { data: extraConfigs } = await supabase
-//           .from("user_meal_configs")
-//           .select("*")
-//           .in("user_id", batch);
-//         if (extraConfigs) allConfigs.push(...extraConfigs);
-//       }
-//     }
-
-//     // 3. Query users in batches (Supabase has URL length limits)
-//     const allUsers: Record<string, unknown>[] = [];
-//     for (let i = 0; i < userIds.length; i += 200) {
-//       const batch = userIds.slice(i, i + 200);
-//       const { data: users, error: userError } = await supabase
-//         .from("users")
-//         .select(
-//           "id, bteg_id, idcard_number, first_name, last_name, nice_name, department_name, heltes_name, position_name, is_active",
-//         )
-//         .in("id", batch);
-//       if (userError) throw new Error(`users: ${userError.message}`);
-//       if (users) allUsers.push(...users);
-//     }
-
-//     // 4. Map to local format and save
-//     const employees = allUsers.map((u: Record<string, unknown>) => ({
-//       id: u.id as string,
-//       employeeCode: (u.bteg_id as string) || "",
-//       idcardNumber: (u.idcard_number as string) || "",
-//       name:
-//         (u.nice_name as string) ||
-//         `${u.last_name || ""} ${u.first_name || ""}`.trim(),
-//       department: (u.department_name as string) || "",
-//       position: (u.position_name as string) || "",
-//       heltesName: (u.heltes_name as string) || "",
-//       isActive: u.is_active !== false,
-//     }));
-
-//     const mealConfigs = allConfigs.map((c: Record<string, unknown>) => ({
-//       userId: c.user_id as string,
-//       breakfastLocation: c.breakfast_location as number | null,
-//       lunchLocation: c.lunch_location as number | null,
-//       dinnerLocation: c.dinner_location as number | null,
-//       nightMealLocation: c.night_meal_location as number | null,
-//       morningMealLocation: c.morning_meal_location as number | null,
-//     }));
-
-//     await db.transaction("rw", db.employees, db.userMealConfigs, async () => {
-//       await db.employees.clear();
-//       await db.employees.bulkAdd(employees);
-//       await db.userMealConfigs.clear();
-//       await db.userMealConfigs.bulkAdd(mealConfigs);
-//     });
-
-//     await db.kioskConfig.put({
-//       key: KIOSK_CONFIG_KEYS.LAST_EMPLOYEE_SYNC,
-//       value: new Date().toISOString(),
-//       updatedAt: new Date().toISOString(),
-//     });
-
-//     if (typeof logId === "number") {
-//       await db.syncLog.update(logId, {
-//         status: "success",
-//         recordCount: employees.length,
-//         completedAt: new Date().toISOString(),
-//       });
-//     }
-
-//     return employees.length;
-//   } catch (error) {
-//     if (typeof logId === "number") {
-//       await db.syncLog.update(logId, {
-//         status: "failed",
-//         completedAt: new Date().toISOString(),
-//         error: error instanceof Error ? error.message : "Unknown error",
-//       });
-//     }
-//     throw error;
-//   }
-// }
-
 export async function pullEmployees(): Promise<number> {
   if (!navigator.onLine) return 0;
   const logId = await logSync("pull-employees", "started", 0);
@@ -193,7 +47,7 @@ export async function pullEmployees(): Promise<number> {
 
     if (diningHallId) {
       query = query.or(
-        `breakfast_location.eq.${diningHallId},lunch_location.eq.${diningHallId},dinner_location.eq.${diningHallId},night_meal_location.eq.${diningHallId},morning_meal_location.eq.${diningHallId}`,
+        `breakfast_location.eq.${diningHallId},lunch_location.eq.${diningHallId},dinner_location.eq.${diningHallId},night_meal_location.eq.${diningHallId},morning_meal_location.eq.${diningHallId},extend_morning_meal_location.eq.${diningHallId},extend_lunch_location.eq.${diningHallId}`,
       );
     }
 
@@ -214,6 +68,8 @@ export async function pullEmployees(): Promise<number> {
       position: row.position_name || "",
       heltesName: row.heltes_name || "",
       isActive: true, // View-ийн WHERE нөхцөлөөр аль хэдийн true байгаа
+      shiftStart: row.start_at || "",
+      shiftEnd: row.end_at || "",
     }));
 
     const mealConfigs = (allData || []).map((row) => ({
@@ -223,6 +79,8 @@ export async function pullEmployees(): Promise<number> {
       dinnerLocation: row.dinner_location,
       nightMealLocation: row.night_meal_location,
       morningMealLocation: row.morning_meal_location,
+      extendMorningMealLocation: row.extend_morning_meal_location,
+      extendLunchLocation: row.extend_lunch_location,
     }));
 
     // 4. Локал баазад хадгалах
@@ -354,7 +212,7 @@ export async function pullMealLocationOverrides(): Promise<number> {
 
   try {
     const supabase = await getSupabaseClient();
-    const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
+    const today = new Date().toLocaleDateString("en-CA");
 
     const { data: allOverrides, error } = await supabase
       .from("meal_location_overrides")
@@ -364,11 +222,6 @@ export async function pullMealLocationOverrides(): Promise<number> {
 
     if (error)
       throw new Error(`meal_location_overrides error: ${error.message}`);
-
-    if (!allOverrides || allOverrides.length === 0) {
-      console.warn("No data returned from server, keeping local data.");
-      return 0;
-    }
 
     const mappedOverrides = (allOverrides || []).map((o) => ({
       id: o.id as number,
@@ -380,17 +233,13 @@ export async function pullMealLocationOverrides(): Promise<number> {
       note: (o.note as string) || null,
     }));
 
-    // 2. Override хийсэн ажилчдын дэлгэрэнгүй мэдээллийг татах
-    // Ингэснээр өөр гал тогооны ажилтан ирсэн ч QR уншихад нэр нь гарч ирнэ
-    const userIds = mappedOverrides.map((o) => o.userId);
-    console.log("overrides user id: ", userIds);
-
-    if (userIds.length > 0) {
-      // Хурдтай байх үүднээс users_with_stats-аас зөвхөн хэрэгцээт багануудыг авна
+    // 2. Ажилчдын мэдээллийг татах (Override байгаа үед л)
+    if (mappedOverrides.length > 0) {
+      const userIds = mappedOverrides.map((o) => o.userId);
       const { data: userData, error: userError } = await supabase
         .from("users_with_stats")
         .select(
-          "user_id, bteg_id, idcard_number, first_name, last_name, heltes_name, position_name, phone",
+          "user_id, bteg_id, idcard_number, first_name, last_name, heltes_name, position_name, phone, start_at, end_at",
         )
         .in("user_id", userIds);
 
@@ -405,23 +254,26 @@ export async function pullMealLocationOverrides(): Promise<number> {
           heltesName: row.heltes_name || "",
           position: row.position_name || "",
           isActive: true,
+          shiftStart: row.start_at || "",
+          shiftEnd: row.end_at || "",
         }));
-
-        // db.employees.clear() хийж болохгүй! Зөвхөн bulkPut ашиглан нэмэх/шинэчлэх
-        console.log("Syncing employees for overrides:", mappedEmployees);
         await db.employees.bulkPut(mappedEmployees);
       }
     }
 
-    // 3. Override мэдээллүүдийг локал баазад хадгалах
-    if (mappedOverrides.length > 0) {
-      await db.transaction("rw", db.mealLocationOverrides, async () => {
-        await db.mealLocationOverrides.clear();
+    // 3. Локаль баазыг заавал ШИНЭЧЛЭХ (Энд хамгийн чухал хэсэг)
+    await db.transaction("rw", db.mealLocationOverrides, async () => {
+      // Сервер дээр дата байсан ч, байгаагүй ч эхлээд локаль баазаа цэвэрлэнэ
+      await db.mealLocationOverrides.clear();
+
+      if (mappedOverrides.length > 0) {
+        // Зөвхөн идэвхтэй байгааг нь нэмнэ
         await db.mealLocationOverrides.bulkAdd(mappedOverrides);
-      });
-    } else {
-      console.log("No overrides found on server, keeping local.");
-    }
+        console.log(`Synced ${mappedOverrides.length} active overrides.`);
+      } else {
+        console.log("No active overrides on server. Local storage cleared.");
+      }
+    });
 
     if (typeof logId === "number") {
       await db.syncLog.update(logId, {
@@ -443,79 +295,6 @@ export async function pullMealLocationOverrides(): Promise<number> {
     throw error;
   }
 }
-
-// export async function pullMealLocationOverrides(): Promise<number> {
-//   const logId = await logSync("pull-overrides", "started", 0);
-
-//   try {
-//     const supabase = await getSupabaseClient();
-//     const today = new Date().toISOString().split("T")[0]; // Get all local employee IDs
-
-//     const localEmployeeIds = await db.employees.toCollection().primaryKeys();
-//     if (localEmployeeIds.length === 0) {
-//       await db.mealLocationOverrides.clear();
-//       if (typeof logId === "number") {
-//         await db.syncLog.update(logId, {
-//           status: "success",
-//           recordCount: 0,
-//           completedAt: new Date().toISOString(),
-//         });
-//       }
-//       return 0;
-//     } // Fetch overrides for today where user_id is in local employees
-//     // This catches both "to this hall" and "away from this hall" overrides
-
-//     const allOverrides: Record<string, unknown>[] = [];
-//     for (let i = 0; i < localEmployeeIds.length; i += 200) {
-//       const batch = localEmployeeIds.slice(i, i + 200);
-//       const { data, error } = await supabase
-//         .from("meal_location_overrides")
-//         .select("id, user_id, bteg_id, date, meal_type, dining_hall_id, note")
-//         .eq("date", today)
-//         .in("user_id", batch);
-//       if (error) throw new Error(`meal_location_overrides: ${error.message}`);
-//       if (data) allOverrides.push(...data);
-//     }
-
-//     console.log("Fetched meal location overrides:", allOverrides);
-
-//     const mapped = allOverrides.map((o: Record<string, unknown>) => ({
-//       id: o.id as number,
-//       userId: o.user_id as string,
-//       btegId: (o.bteg_id as string) || "",
-//       date: o.date as string,
-//       mealType: o.meal_type as string,
-//       diningHallId: o.dining_hall_id as number,
-//       note: (o.note as string) || null,
-//     }));
-
-//     await db.transaction("rw", db.mealLocationOverrides, async () => {
-//       await db.mealLocationOverrides.clear();
-//       if (mapped.length > 0) {
-//         await db.mealLocationOverrides.bulkAdd(mapped);
-//       }
-//     });
-
-//     if (typeof logId === "number") {
-//       await db.syncLog.update(logId, {
-//         status: "success",
-//         recordCount: mapped.length,
-//         completedAt: new Date().toISOString(),
-//       });
-//     }
-
-//     return mapped.length;
-//   } catch (error) {
-//     if (typeof logId === "number") {
-//       await db.syncLog.update(logId, {
-//         status: "failed",
-//         completedAt: new Date().toISOString(),
-//         error: error instanceof Error ? error.message : "Unknown error",
-//       });
-//     }
-//     throw error;
-//   }
-// }
 
 export async function pullMealTimeSlots(): Promise<number> {
   const logId = await logSync("pull-time-slots", "started", 0);

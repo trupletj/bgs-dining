@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { Users, CheckCircle2, Star, Hand } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { useMealLogs } from "@/hooks/use-meal-logs";
 import { useCurrentMeal } from "@/hooks/use-current-meal";
 import { useKioskConfig } from "@/hooks/use-kiosk-config";

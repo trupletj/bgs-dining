@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { StatusBar } from "@/components/kiosk/status-bar";
 import { CurrentMealDisplay } from "@/components/kiosk/current-meal-display";
 import { IdleScreen } from "@/components/kiosk/idle-screen";
@@ -23,8 +23,12 @@ import { useSync } from "@/hooks/use-sync";
 import { db, type Employee, type MealLog } from "@/lib/db";
 import { checkDuplicateMealLog, createMealLog } from "@/hooks/use-meal-logs";
 import { getMealLocationForSlot } from "@/lib/meal-type-map";
-import { KIOSK_CONFIG_KEYS } from "@/lib/constants";
-import { MEAL_NAME_MAP } from "@/lib/constants";
+import {
+  getAllowedMealTypesForShift,
+  KIOSK_CONFIG_KEYS,
+  MEAL_NAME_MAP,
+} from "@/lib/constants";
+import { ScrollArea } from "../ui/scroll-area";
 
 type ScanState = "idle" | "processing" | "result";
 
@@ -42,7 +46,10 @@ export function ScanScreen() {
   const [confirmationResult, setConfirmationResult] =
     useState<ConfirmationResult | null>(null);
   const [pendingModal, setPendingModal] = useState<PendingModal | null>(null);
-  const { currentMeal } = useCurrentMeal();
+  const { activeMeals } = useCurrentMeal();
+
+  const currentMeal = activeMeals.length > 0 ? activeMeals[0] : null;
+
   const { value: diningHallId } = useKioskConfig(
     KIOSK_CONFIG_KEYS.DINING_HALL_ID,
   );
@@ -67,20 +74,18 @@ export function ScanScreen() {
     async (params: {
       employee: Employee;
       isExtraServing: boolean;
+      mealType: string;
       isManualOverride: boolean;
     }) => {
-      if (!currentMeal || !diningHallId) return;
+      if (!diningHallId) return;
 
-      console.log("employee", params.employee);
       const today = new Date().toISOString().split("T")[0];
-      console.log("Creating meal log with params:", params);
-
       await createMealLog({
         userId: params.employee.id,
         btegId: params.employee.employeeCode,
         idcardNumber: params.employee.idcardNumber,
         employeeName: params.employee.name,
-        mealType: currentMeal.mealType,
+        mealType: params.mealType,
         diningHallId: Number(diningHallId),
         date: today,
         scannedAt: new Date().toISOString(),
@@ -91,22 +96,18 @@ export function ScanScreen() {
         deviceUuid: deviceUuid ?? null,
         syncKey: generateSyncKey(
           params.employee.id,
-          currentMeal.mealType,
+          params.mealType,
           today,
           params.isExtraServing,
         ),
       });
     },
-    [currentMeal, diningHallId, activeChefId, deviceUuid],
+    [diningHallId, activeChefId, deviceUuid],
   );
 
   const handleScan = useCallback(
     async (code: string) => {
-      if (scanState === "processing") return;
-      setScanState("processing");
-
-      try {
-        // 1. Хоолны цаг шалгах
+      if (scanState === "processing" || !currentMeal) {
         if (!currentMeal) {
           setConfirmationResult({
             type: "warning",
@@ -114,20 +115,17 @@ export function ScanScreen() {
             message: "Одоогоор хоолны цаг эхлээгүй байна",
           });
           setScanState("result");
-          return;
         }
+        return;
+      }
 
-        // 2. QR код задлах (Parsing)
-        let qrData: {
-          id_card_number?: string;
-          bteg_id?: number | string;
-          key?: string;
-        } | null = null;
+      setScanState("processing");
+
+      try {
+        // 1. QR код задлах
+        let qrData: any = null;
         try {
           qrData = JSON.parse(code);
-          if (!qrData?.bteg_id && !qrData?.id_card_number) {
-            throw new Error("Invalid format");
-          }
         } catch (e) {
           playSound("error");
           setConfirmationResult({
@@ -155,7 +153,7 @@ export function ScanScreen() {
           return;
         }
 
-        // 3. Ажилчныг хайх (Эхлээд bteg_id-аар, дараа нь idcard-аар)
+        // 2. Ажилчныг хайх
         let employee = null;
         if (lookupBteg) {
           employee = await db.employees
@@ -170,19 +168,17 @@ export function ScanScreen() {
             .first();
         }
 
-        // 4. Ажилчин олдоогүй бол
         if (!employee) {
           setPendingModal({
             type: "unauthorized",
             btegId: lookupBteg || "",
-            scannedCode: lookupIdCard || "Unknown",
+            scannedCode: lookupIdCard || code,
             message: "Бүртгэлгүй ажилтан",
           });
           setScanState("idle");
           return;
         }
 
-        // 5. Идэвхтэй эсэхийг шалгах
         if (!employee.isActive) {
           playSound("error");
           setConfirmationResult({
@@ -195,11 +191,55 @@ export function ScanScreen() {
           return;
         }
 
-        // 6. Гал тогооны зөвшөөрөл шалгах (Location Override & Config)
+        const allowedMeals = getAllowedMealTypesForShift(
+          employee.shiftStart,
+          employee.shiftEnd,
+        );
+        let targetMealType = currentMeal.mealType;
+
+        if (!allowedMeals.includes(targetMealType)) {
+          // 1. Өдрийн хоолыг Extend Lunch рүү хөрвүүлэх
+          if (
+            targetMealType === "lunch" &&
+            allowedMeals.includes("extend_lunch")
+          ) {
+            targetMealType = "extend_lunch";
+          }
+
+          // 2. Өглөөний хоолыг Extend Morning Meal рүү хөрвүүлэх
+          else if (
+            (targetMealType === "breakfast" ||
+              targetMealType === "morning_meal") &&
+            allowedMeals.includes("extend_morning_meal")
+          ) {
+            targetMealType = "extend_morning_meal";
+          }
+          // 3. Өглөөний хоолыг Morning Meal рүү хөрвүүлэх (Шөнийн ээлжийнхэнд зориулсан)
+          else if (
+            targetMealType === "breakfast" &&
+            allowedMeals.includes("morning_meal")
+          ) {
+            targetMealType = "morning_meal";
+          }
+        }
+
+        if (!allowedMeals.includes(targetMealType)) {
+          setPendingModal({
+            type: "unauthorized",
+            employee,
+            btegId: lookupBteg || "",
+            scannedCode: lookupIdCard || code,
+            message: `${employee.name} одоо идэвхтэй байгаа (${MEAL_NAME_MAP[targetMealType as keyof typeof MEAL_NAME_MAP] || targetMealType}) хоолыг идэх хуваарьгүй байна.`,
+          });
+          setScanState("idle");
+          return;
+        }
+
+        // 4. Гал тогооны зөвшөөрөл шалгах
         const today = new Date().toISOString().split("T")[0];
         const override = await db.mealLocationOverrides
           .where("[userId+date+mealType]")
-          .equals([employee.id, today, currentMeal.mealType])
+          .equals([employee.id, today, targetMealType])
           .first();
 
         if (override) {
@@ -217,31 +257,22 @@ export function ScanScreen() {
           }
         } else {
           const config = await db.userMealConfigs.get(employee.id);
-          if (!config) {
-            setPendingModal({
-              type: "unauthorized",
-              employee,
-              btegId: lookupBteg || "",
-              scannedCode: lookupIdCard || "Unknown",
-              message: `${employee.name} хоолны тохиргоо хийгдээгүй байна`,
-            });
-            setScanState("idle");
-            return;
-          }
+          const location = config
+            ? getMealLocationForSlot(config, targetMealType)
+            : null;
 
-          const location = getMealLocationForSlot(config, currentMeal.mealType);
           if (
+            !config ||
             location === null ||
             (location !== "skip" &&
               diningHallId &&
               location !== Number(diningHallId))
           ) {
-            // Буруу гал тогоо эсвэл бүртгэлгүй бол
             setPendingModal({
               type: "unauthorized",
               employee,
               btegId: lookupBteg || "",
-              scannedCode: lookupIdCard || "Unknown",
+              scannedCode: lookupIdCard || code,
               message: `${employee.name} энэ гал тогоонд бүртгэлгүй`,
             });
             setScanState("idle");
@@ -249,10 +280,10 @@ export function ScanScreen() {
           }
         }
 
-        // 7. Давхардал шалгах
+        // 5. Давхардал шалгах
         const existing = await checkDuplicateMealLog(
           employee.id,
-          currentMeal.mealType,
+          targetMealType,
           today,
         );
         if (existing) {
@@ -260,7 +291,7 @@ export function ScanScreen() {
             type: "double-scan",
             employee,
             btegId: lookupBteg || "",
-            scannedCode: lookupIdCard || "Unknown",
+            scannedCode: lookupIdCard || code,
             message: `${employee.name} аль хэдийн бүртгүүлсэн`,
             existingLog: existing,
           });
@@ -268,10 +299,11 @@ export function ScanScreen() {
           return;
         }
 
-        // 8. Амжилттай бүртгэх
+        // 6. Амжилттай бүртгэх
         await doCreateLog({
           employee,
           isExtraServing: false,
+          mealType: targetMealType,
           isManualOverride: false,
         });
         playSound("success");
@@ -280,7 +312,7 @@ export function ScanScreen() {
           title: "Амжилттай",
           message: "Хоолны бүртгэл хийгдлээ",
           employeeName: employee.name,
-          mealName: getMealName(currentMeal.mealType),
+          mealName: getMealName(targetMealType),
         });
         setScanState("result");
       } catch (error) {
@@ -296,10 +328,6 @@ export function ScanScreen() {
     setConfirmationResult(null);
   }, []);
 
-  const handleModalClose = useCallback(() => {
-    setPendingModal(null);
-  }, []);
-
   const handleApproveManually = useCallback(async () => {
     if (!pendingModal || !currentMeal || !diningHallId) return;
 
@@ -310,6 +338,7 @@ export function ScanScreen() {
       await doCreateLog({
         employee,
         isExtraServing: false,
+        mealType: currentMeal.mealType,
         isManualOverride: true,
       });
     } else {
@@ -327,7 +356,7 @@ export function ScanScreen() {
         isManualOverride: true,
         chefId: activeChefId ? Number(activeChefId) : null,
         deviceUuid: deviceUuid ?? null,
-        syncKey: `manual-${pendingModal.scannedCode}-${currentMeal.id}-${today}-${Date.now()}`,
+        syncKey: `manual-${pendingModal.scannedCode}-${today}-${Date.now()}`,
       });
     }
 
@@ -347,15 +376,15 @@ export function ScanScreen() {
     activeChefId,
     deviceUuid,
     doCreateLog,
-    // Хэрэв createMealLog нь hook-ээс ирж байгаа бол энд бас нэмж магадгүй шүү (original код дээр байгаагүй байна)
   ]);
 
   const handleAddExtraServing = useCallback(async () => {
-    if (!pendingModal?.employee) return;
+    if (!pendingModal?.employee || !currentMeal) return;
 
     await doCreateLog({
       employee: pendingModal.employee,
       isExtraServing: true,
+      mealType: currentMeal.mealType,
       isManualOverride: false,
     });
 
@@ -365,7 +394,7 @@ export function ScanScreen() {
       title: "Нэмэлт порц",
       message: "Нэмэлт порц бүртгэгдлээ",
       employeeName: pendingModal.employee.name,
-      mealName: getMealName(currentMeal?.mealType ?? ""),
+      mealName: getMealName(currentMeal.mealType),
     });
     setScanState("result");
   }, [pendingModal, currentMeal, doCreateLog]);
@@ -376,30 +405,18 @@ export function ScanScreen() {
   });
 
   return (
-    <div
-      className="flex h-screen flex-col select-none bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950"
-      onContextMenu={(e) => e.preventDefault()}>
-      {/* Animated radial gradient overlay */}
-      <div
-        className="pointer-events-none fixed inset-0 z-0 opacity-30"
-        style={{
-          background:
-            "radial-gradient(ellipse at 20% 50%, rgba(59,130,246,0.15) 0%, transparent 50%), radial-gradient(ellipse at 80% 50%, rgba(139,92,246,0.1) 0%, transparent 50%)",
-        }}
-      />
-
+    <div className="flex h-screen flex-col select-none bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <div className="relative z-10 flex h-screen flex-col">
         <StatusBar />
-
-        <div className="flex items-center justify-between border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-6 py-2.5 shadow-[0_1px_0_0_rgba(255,255,255,0.02)]">
+        <div className="flex items-center justify-between border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-6 py-2.5">
           <CurrentMealDisplay />
           <div className="flex items-center gap-2">
             <button
               onClick={() => syncEmployees()}
               disabled={syncState === "syncing"}
-              className="flex items-center gap-2 rounded-xl bg-slate-800/60 backdrop-blur-sm border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 shadow-lg transition-all duration-200 hover:bg-slate-700/60 hover:border-white/15 hover:text-slate-100 hover:shadow-[0_0_20px_-5px_rgba(59,130,246,0.2)] disabled:opacity-50">
+              className="flex items-center gap-2 rounded-xl bg-slate-800/60 border border-white/10 px-4 py-2 text-sm text-slate-300 hover:text-white">
               <RefreshCw
-                className={`h-4 w-4 text-blue-400 ${syncState === "syncing" ? "animate-spin" : ""}`}
+                className={`h-4 w-4 ${syncState === "syncing" ? "animate-spin" : ""}`}
               />
               Шинэчлэх
             </button>
@@ -407,24 +424,58 @@ export function ScanScreen() {
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          <div className="relative flex flex-1 flex-col items-center justify-center gap-6 overflow-hidden">
-            {/* Animated background blobs */}
-            <div className="pointer-events-none absolute inset-0">
-              <div className="animate-pulse-slow absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-blue-500/5 blur-3xl" />
-              <div
-                className="animate-pulse-slow absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-purple-500/5 blur-3xl"
-                style={{ animationDelay: "2s" }}
-              />
-            </div>
+        <div className="flex flex-1 overflow-hidden bg-slate-950">
+          {/* Зүүн тал: Сканнер */}
+          <div className="relative flex flex-[2] flex-col items-center justify-center gap-6">
             <IdleScreen />
             <CameraScanner onScan={handleScan} />
           </div>
-          <div className="relative flex h-full w-96 flex-col overflow-hidden border-l border-white/5 bg-slate-900/60 backdrop-blur-2xl shadow-[-4px_0_24px_-4px_rgba(0,0,0,0.3)]">
-            {/* Glass shine overlay */}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent" />
-            <ChefDashboard />
-            <ConfirmedListSidebar />
+
+          <div
+            className={`
+  relative border-l border-white/5 bg-slate-900/40 backdrop-blur-2xl transition-all duration-500 ease-in-out
+  ${activeMeals.length === 2 ? "flex-[2] w-[600px]" : "flex-[0.8] w-80"}
+`}>
+            {activeMeals.length === 2 ? (
+              <div className="flex h-full w-full">
+                <div className="flex flex-1 flex-col border-r border-white/5 bg-slate-900/20">
+                  <div className="p-3 border-b border-white/5 bg-slate-900/40">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70">
+                      Гал тогоо (Давхар ээлж)
+                    </h3>
+                  </div>
+                  <ScrollArea className="flex-1">
+                    <div className="flex flex-col">
+                      {activeMeals.map((meal) => (
+                        <ChefDashboard key={meal.id} mealSlot={meal} />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                <div className="flex flex-1 flex-col">
+                  <ConfirmedListSidebar />
+                </div>
+              </div>
+            ) : (
+              <div className="flex h-full flex-col">
+                <div className="border-b border-white/5 bg-slate-900/40">
+                  {activeMeals.length > 0 ? (
+                    activeMeals.map((meal) => (
+                      <ChefDashboard key={meal.id} mealSlot={meal} />
+                    ))
+                  ) : (
+                    <div className="p-6 text-center text-slate-500 text-sm italic">
+                      Хоолны цаг эхлээгүй
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 min-h-0">
+                  <ConfirmedListSidebar />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -439,7 +490,7 @@ export function ScanScreen() {
       {pendingModal?.type === "unauthorized" && (
         <ScanModal
           open={true}
-          onClose={handleModalClose}
+          onClose={() => setPendingModal(null)}
           onApproveManually={handleApproveManually}
           scannedCode={pendingModal.scannedCode}
           employeeName={pendingModal.employee?.name}
@@ -450,10 +501,10 @@ export function ScanScreen() {
       {pendingModal?.type === "double-scan" && pendingModal.employee && (
         <DoubleScanModal
           open={true}
-          onClose={handleModalClose}
+          onClose={() => setPendingModal(null)}
           onAddExtraServing={handleAddExtraServing}
           employeeName={pendingModal.employee.name}
-          mealName={currentMeal?.mealType ?? ""}
+          mealName={getMealName(currentMeal?.mealType ?? "")}
           existingScanTime={pendingModal.existingLog?.scannedAt ?? ""}
         />
       )}

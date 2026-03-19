@@ -5,11 +5,19 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
 import { useCurrentMeal } from "@/hooks/use-current-meal";
 import { useKioskConfig } from "@/hooks/use-kiosk-config";
-import { KIOSK_CONFIG_KEYS, MEAL_TYPE_COLUMN_MAP } from "@/lib/constants";
+import {
+  KIOSK_CONFIG_KEYS,
+  MEAL_NAME_MAP,
+  MEAL_TYPE_COLUMN_MAP,
+} from "@/lib/constants";
 import { Users, CheckCircle2, Clock, Hand, Star } from "lucide-react";
 
-export function ChefDashboard() {
-  const { currentMeal, currentTime } = useCurrentMeal();
+interface ChefDashboardProps {
+  mealSlot: any;
+}
+
+export function ChefDashboard({ mealSlot }: ChefDashboardProps) {
+  const { currentTime } = useCurrentMeal();
   const { value: diningHallId } = useKioskConfig(
     KIOSK_CONFIG_KEYS.DINING_HALL_ID,
   );
@@ -20,16 +28,10 @@ export function ChefDashboard() {
   );
 
   const expected = useLiveQuery(async () => {
-    console.log(
-      "Calculating expected count for meal:",
-      currentMeal,
-      "and dining hall:",
-      diningHallId,
-    );
-    if (!currentMeal || !diningHallId) return 0;
+    if (!mealSlot || !diningHallId) return 0;
 
     const hallId = Number(diningHallId);
-    const columnName = MEAL_TYPE_COLUMN_MAP[currentMeal.mealType];
+    const columnName = MEAL_TYPE_COLUMN_MAP[mealSlot.mealType];
     const todayStr = today; // Гаднаас ирж буй өнөөдрийн огноо
 
     let defaultCount: number;
@@ -45,7 +47,7 @@ export function ChefDashboard() {
     const incoming = await db.mealLocationOverrides
       .where("[date+diningHallId]")
       .equals([todayStr, hallId])
-      .filter((o) => o.mealType === currentMeal.mealType)
+      .filter((o) => o.mealType === mealSlot.mealType)
       .count();
 
     let outgoing = 0;
@@ -54,8 +56,7 @@ export function ChefDashboard() {
         .where("date")
         .equals(todayStr)
         .filter(
-          (o) =>
-            o.mealType === currentMeal.mealType && o.diningHallId !== hallId,
+          (o) => o.mealType === mealSlot.mealType && o.diningHallId !== hallId,
         )
         .toArray();
 
@@ -71,12 +72,11 @@ export function ChefDashboard() {
     }
 
     return defaultCount + incoming - outgoing;
-  }, [currentMeal?.id, diningHallId, today]);
+  }, [mealSlot?.id, diningHallId, today]);
 
   // Meal log counts for today + current meal + this dining hall
   const counts = useLiveQuery(async () => {
-    if (!currentMeal || !diningHallId)
-      return { served: 0, manual: 0, extra: 0 };
+    if (!mealSlot || !diningHallId) return { served: 0, manual: 0, extra: 0 };
 
     const hallId = Number(diningHallId);
 
@@ -84,7 +84,7 @@ export function ChefDashboard() {
       .where("date")
       .equals(today)
       .filter(
-        (l) => l.mealType === currentMeal.mealType && l.diningHallId === hallId,
+        (l) => l.mealType === mealSlot.mealType && l.diningHallId === hallId,
       )
       .toArray();
 
@@ -98,7 +98,7 @@ export function ChefDashboard() {
       },
       { served: 0, manual: 0, extra: 0 },
     );
-  }, [currentMeal?.id, diningHallId, today]);
+  }, [mealSlot?.mealType, diningHallId, today]);
 
   const expectedCount = expected ?? 0;
   const servedCount = counts?.served ?? 0;
@@ -111,7 +111,7 @@ export function ChefDashboard() {
       ? Math.min(100, Math.round((servedCount / expectedCount) * 100))
       : 0;
 
-  if (!currentMeal) {
+  if (!mealSlot) {
     return (
       <div className="relative flex shrink-0 flex-col gap-3 border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-4 py-8 shadow-lg items-center justify-center">
         <Clock className="h-8 w-8 text-slate-500 animate-pulse" />
@@ -126,6 +126,15 @@ export function ChefDashboard() {
     <div className="relative flex shrink-0 flex-col gap-3 border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-4 py-4 shadow-[0_4px_30px_-10px_rgba(0,0,0,0.3)]">
       {/* Gradient overlay */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent" />
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-bold uppercase text-blue-400">
+          {MEAL_NAME_MAP[mealSlot.mealType as keyof typeof MEAL_NAME_MAP] ||
+            mealSlot.mealType}
+        </h3>
+        <span className="text-[10px] text-slate-500">
+          {mealSlot.startTime} - {mealSlot.endTime}
+        </span>
+      </div>
 
       <div className="relative grid grid-cols-2 gap-2">
         {/* Expected (blue) */}

@@ -11,15 +11,19 @@ export interface Employee {
   position: string;
   heltesName: string;
   isActive: boolean;
+  shiftStart: string;
+  shiftEnd: string;
 }
 
 export interface UserMealConfig {
-  userId: string; // uuid, same as Employee.id
+  userId: string;
   breakfastLocation: number | null;
   lunchLocation: number | null;
   dinnerLocation: number | null;
   nightMealLocation: number | null;
   morningMealLocation: number | null;
+  extendMorningMealLocation: number | null;
+  extendLunchLocation: number | null;
 }
 
 export interface MealLog {
@@ -194,6 +198,10 @@ class CanteenDB extends Dexie {
     });
     this.version(7).stores({
       employees: "id, employeeCode, idcardNumber, phone, isActive",
+    });
+    this.version(8).stores({
+      userMealConfigs:
+        "userId, breakfastLocation, lunchLocation, dinnerLocation, nightMealLocation, morningMealLocation, extendMorningMealLocation, extendLunchLocation",
     });
   }
 }

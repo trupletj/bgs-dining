@@ -24,16 +24,3 @@ export function getMealLocationForSlot(
   if (typeof value === "number") return value;
   return null;
 }
-
-/**
- * Maps local meal slot ID to the Supabase column name in user_meal_configs
- * (snake_case version for Supabase queries).
- */
-export const MEAL_TYPE_SUPABASE_COLUMN_MAP: Record<string, string | null> = {
-  morning_meal: "morning_meal_location",
-  breakfast: "breakfast_location",
-  lunch: "lunch_location",
-  snack: null,
-  dinner: "dinner_location",
-  nightmeal: "night_meal_location",
-};

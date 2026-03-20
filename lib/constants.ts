@@ -67,7 +67,7 @@ export const DEFAULT_MEAL_SLOTS = [
     sortOrder: 4,
   },
   {
-    id: "nightmeal",
+    id: "night_meal",
     name: "Шөнийн хоол",
     startTime: "23:00",
     endTime: "01:00",
@@ -105,7 +105,7 @@ export const MEAL_TYPE_COLUMN_MAP: Record<string, string | null> = {
   lunch: "lunchLocation",
   snack: null, // No dedicated column; allow if user has any config
   dinner: "dinnerLocation",
-  nightmeal: "nightMealLocation",
+  night_meal: "nightMealLocation",
 };
 
 export const SCANNER_KEYSTROKE_THRESHOLD_MS = 50;

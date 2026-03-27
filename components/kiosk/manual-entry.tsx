@@ -6,7 +6,7 @@ import { db, type Employee, type MealLog } from "@/lib/db";
 import { useCurrentMeal } from "@/hooks/use-current-meal";
 import { useKioskConfig } from "@/hooks/use-kiosk-config";
 import { createMealLog, checkDuplicateMealLog } from "@/hooks/use-meal-logs";
-import { KIOSK_CONFIG_KEYS } from "@/lib/constants";
+import { getLocalDate, KIOSK_CONFIG_KEYS } from "@/lib/constants";
 import {
   Dialog,
   DialogContent,
@@ -70,7 +70,7 @@ export function ManualEntry() {
       return;
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalDate();
     const existing = await checkDuplicateMealLog(
       employee.id,
       currentMeal.mealType,
@@ -106,7 +106,7 @@ export function ManualEntry() {
   const handleAddExtraServing = useCallback(async () => {
     if (!duplicate || !currentMeal || !diningHallId) return;
     const { employee } = duplicate;
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalDate();
 
     console.log("Adding extra serving for employee:", employee);
 

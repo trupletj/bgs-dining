@@ -19,9 +19,10 @@ export function useMealLogs(filters: MealLogFilters = {}) {
         results.filter((r) => {
           if (filters.date && r.date !== filters.date) return false;
           if (filters.mealType && r.mealType !== filters.mealType) return false;
-          if (filters.diningHallId && r.diningHallId !== filters.diningHallId) return false;
+          if (filters.diningHallId && r.diningHallId !== filters.diningHallId)
+            return false;
           return true;
-        })
+        }),
       );
   }, [filters.date, filters.mealType, filters.diningHallId]);
 
@@ -50,7 +51,7 @@ export function useTodayMealLogCount(diningHallId?: number | null) {
 
 export function usePendingSyncCount() {
   const count = useLiveQuery(() =>
-    db.mealLogs.where("syncStatus").equals("pending").count()
+    db.mealLogs.where("syncStatus").equals("pending").count(),
   );
   return count ?? 0;
 }
@@ -58,7 +59,7 @@ export function usePendingSyncCount() {
 export async function checkDuplicateMealLog(
   userId: string,
   mealType: string,
-  date: string
+  date: string,
 ): Promise<MealLog | undefined> {
   return db.mealLogs
     .where("[userId+mealType+date]")
@@ -66,9 +67,7 @@ export async function checkDuplicateMealLog(
     .first();
 }
 
-export async function createMealLog(
-  log: Omit<MealLog, "id">
-): Promise<number> {
+export async function createMealLog(log: Omit<MealLog, "id">): Promise<number> {
   const id = await db.mealLogs.add(log);
   return id as number;
 }

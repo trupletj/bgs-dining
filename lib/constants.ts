@@ -197,3 +197,10 @@ function extractHour(dateStr: string): number {
 
   return parseInt(dateStr.split(":")[0], 10);
 }
+
+export const getLocalDate = (): string => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  const localDate = new Date(now.getTime() - offset);
+  return localDate.toISOString().split("T")[0];
+};

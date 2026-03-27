@@ -25,6 +25,7 @@ import { checkDuplicateMealLog, createMealLog } from "@/hooks/use-meal-logs";
 import { getMealLocationForSlot } from "@/lib/meal-type-map";
 import {
   getAllowedMealTypesForShift,
+  getLocalDate,
   KIOSK_CONFIG_KEYS,
   MEAL_NAME_MAP,
 } from "@/lib/constants";
@@ -79,7 +80,7 @@ export function ScanScreen() {
     }) => {
       if (!diningHallId) return;
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getLocalDate();
       await createMealLog({
         userId: params.employee.id,
         btegId: params.employee.employeeCode,
@@ -331,7 +332,7 @@ export function ScanScreen() {
   const handleApproveManually = useCallback(async () => {
     if (!pendingModal || !currentMeal || !diningHallId) return;
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalDate();
     const employee = pendingModal.employee;
 
     if (employee) {

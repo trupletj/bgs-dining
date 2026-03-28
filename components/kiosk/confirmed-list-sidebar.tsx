@@ -44,7 +44,7 @@ export function ConfirmedListSidebar() {
             {logs.map((log, index) => (
               <li
                 key={log.id}
-                className="group relative flex items-start gap-3 overflow-hidden rounded-xl bg-slate-800/40 backdrop-blur-sm border border-white/5 px-3 py-2.5 transition-all duration-200 hover:bg-slate-800/60 hover:border-white/10 hover:shadow-[0_0_20px_-5px_rgba(59,130,246,0.1)] animate-in slide-in-from-right-5 fade-in-0 duration-300"
+                className="group relative flex items-start gap-3 overflow-hidden rounded-xl bg-slate-800/40 backdrop-blur-sm border border-white/5 px-3 py-2.5 transition-all hover:bg-slate-800/60 hover:border-white/10 hover:shadow-[0_0_20px_-5px_rgba(59,130,246,0.1)] animate-in slide-in-from-right-5 fade-in-0 duration-300"
                 style={{
                   animationDelay: `${Math.min(index * 50, 500)}ms`,
                   animationFillMode: "backwards",

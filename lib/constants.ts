@@ -199,8 +199,10 @@ function extractHour(dateStr: string): number {
 }
 
 export const getLocalDate = (): string => {
-  const now = new Date();
-  const offset = now.getTimezoneOffset() * 60000;
-  const localDate = new Date(now.getTime() - offset);
-  return localDate.toISOString().split("T")[0];
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Ulaanbaatar",
+  }).format(new Date());
 };

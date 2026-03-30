@@ -237,7 +237,7 @@ export function ScanScreen() {
         }
 
         // 4. Гал тогооны зөвшөөрөл шалгах
-        const today = new Date().toISOString().split("T")[0];
+        const today = getLocalDate();
         const override = await db.mealLocationOverrides
           .where("[userId+date+mealType]")
           .equals([employee.id, today, targetMealType])
@@ -283,9 +283,9 @@ export function ScanScreen() {
 
         // 5. Давхардал шалгах
         const existing = await checkDuplicateMealLog(
-          employee.id,
+          employee?.id || "",
           targetMealType,
-          today,
+          lookupIdCard || "",
         );
         if (existing) {
           setPendingModal({

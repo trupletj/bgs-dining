@@ -59,12 +59,27 @@ export function usePendingSyncCount() {
 export async function checkDuplicateMealLog(
   userId: string,
   mealType: string,
-  date: string,
+  idcardNumber?: string,
 ): Promise<MealLog | undefined> {
-  return db.mealLogs
-    .where("[userId+mealType+date]")
-    .equals([userId, mealType, date])
-    .first();
+  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+
+  if (userId && userId !== "") {
+    return await db.mealLogs
+      .where("userId")
+      .equals(userId)
+      .and((log) => log.mealType === mealType && log.scannedAt > sixHoursAgo)
+      .first();
+  }
+
+  if (idcardNumber) {
+    return await db.mealLogs
+      .where("idcardNumber")
+      .equals(idcardNumber)
+      .and((log) => log.mealType === mealType && log.scannedAt > sixHoursAgo)
+      .first();
+  }
+
+  return undefined;
 }
 
 export async function createMealLog(log: Omit<MealLog, "id">): Promise<number> {

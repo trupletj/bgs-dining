@@ -117,75 +117,58 @@ export const DEFAULT_ADMIN_PIN = "1234";
 export function getAllowedMealTypesForShift(
   shiftStartStr: string,
   shiftEndStr: string,
+  scanTime: Date = new Date(),
 ): string[] {
   if (!shiftStartStr || !shiftEndStr) return [];
 
   const startHour = extractHour(shiftStartStr);
   const endHour = extractHour(shiftEndStr);
+  const currentHour = scanTime.getHours();
 
-  console.log(`Parsed Hours -> Start: ${startHour}, End: ${endHour}`);
+  // Туслах функц: Интервалд байгаа эсэхийг шалгах
+  const isBetween = (val: number, min: number, max: number) =>
+    val >= min && val <= max;
 
-  // 1. Өдрийн ээлж: 07/08 - 19/20
-  if (
-    (startHour === 7 || startHour === 8) &&
-    (endHour === 19 || endHour === 20)
-  ) {
+  console.log(`Scan Hour: ${currentHour}, Shift: ${startHour} - ${endHour}`);
+
+  /**
+   * АСУУДЛЫН ШИЙДЭЛ:
+   * Хэрэв одоо өглөө (06-11 цаг) байхад ажилчны ээлж орой (18-20 цагт) эхлэх гэж байгаа бол
+   * энэ хүн "сунасан" ээлж биш, зүгээр л өмнөх өдрийнхөө ажлаас буугаад
+   * эсвэл ажил эхлэхээс өмнө өглөөний хоол идэж байна гэж үзнэ.
+   */
+  if (isBetween(currentHour, 6, 10) && isBetween(startHour, 18, 20)) {
+    return ["morning_meal"]; // Зөвхөн ердийн өглөөний хоол зөвшөөрнө
+  }
+
+  // 1. Өдрийн стандарт ээлж: 07/08 - 19/20
+  if (isBetween(startHour, 7, 8) && isBetween(endHour, 19, 20)) {
     return ["breakfast", "lunch", "dinner"];
   }
 
-  // 2. Шөнийн ээлж: 19/20 - 07/08
-  if (
-    (startHour === 19 || startHour === 20) &&
-    (endHour === 7 || endHour === 8)
-  ) {
+  // 2. Шөнийн стандарт ээлж: 19/20 - 07/08
+  if (isBetween(startHour, 19, 20) && isBetween(endHour, 7, 8)) {
     return ["dinner", "night_meal", "morning_meal"];
   }
 
-  // 3. Өглөөний хагас: 07/08 - 12
-  if ((startHour === 7 || startHour === 8) && endHour === 12) {
+  // 3. Өглөөний хагас ээлж: 07/08 - 12:00
+  if (isBetween(startHour, 7, 8) && endHour === 12) {
     return ["breakfast", "lunch"];
   }
 
-  // 4. Шөнийн уртасгасан ээлж (19/20 - 12)
-  if ((startHour === 19 || startHour === 20) && endHour === 12) {
+  // 4. Шөнийн уртасгасан ээлж (Жишээ нь: 19/20 - 12:00)
+  // Энэ нөхцөл зөвхөн ажил эхэлсний дараа буюу шөнө/өглөөдөө хүчинтэй
+  if (isBetween(startHour, 19, 20) && endHour === 12) {
     return ["dinner", "night_meal", "extend_morning_meal", "extend_lunch"];
   }
-  console.warn("No shift match found for hours:", startHour, endHour);
+
+  // 5. Өдрийн дунд ээлж: 12/13 - 18/19
+  if (isBetween(startHour, 12, 13) && isBetween(endHour, 18, 19)) {
+    return ["lunch", "dinner"];
+  }
+
   return [];
 }
-
-export const resolveMealTypeForEmployee = (
-  employee: Employee | null,
-  baseMealType: string,
-) => {
-  if (!employee) return baseMealType;
-
-  const allowedMeals = getAllowedMealTypesForShift(
-    employee.shiftStart,
-    employee.shiftEnd,
-  );
-  let targetMealType = baseMealType;
-
-  if (!allowedMeals.includes(targetMealType)) {
-    if (
-      targetMealType === "lunch" &&
-      allowedMeals.includes("extend_morning_meal")
-    ) {
-      targetMealType = "extend_morning_meal";
-    } else if (
-      targetMealType === "dinner" &&
-      allowedMeals.includes("extend_lunch")
-    ) {
-      targetMealType = "extend_lunch";
-    } else if (
-      targetMealType === "breakfast" &&
-      allowedMeals.includes("morning_meal")
-    ) {
-      targetMealType = "morning_meal";
-    }
-  }
-  return targetMealType;
-};
 
 function extractHour(dateStr: string): number {
   if (!dateStr) return -1;

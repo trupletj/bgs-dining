@@ -195,6 +195,7 @@ export function ScanScreen() {
         const allowedMeals = getAllowedMealTypesForShift(
           employee.shiftStart,
           employee.shiftEnd,
+          new Date(),
         );
         let targetMealType = currentMeal.mealType;
 

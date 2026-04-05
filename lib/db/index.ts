@@ -32,13 +32,14 @@ export interface MealLog {
   userId: string; // uuid
   idcardNumber: string;
   employeeName: string;
-  mealType: string; // breakfast, lunch, dinner, nightmeal, morning_meal, snack
+  mealType: string; // breakfast, lunch, dinner, night_meal, morning_meal
   diningHallId: number;
   date: string; // YYYY-MM-DD
   scannedAt: string; // ISO timestamp
   syncStatus: "pending" | "synced" | "failed";
   isExtraServing: boolean;
   isManualOverride: boolean;
+  isWrongLocation: boolean; // шинээр нэмсэн
   chefId: number | null;
   deviceUuid: string | null;
   syncKey: string; // unique key for upsert

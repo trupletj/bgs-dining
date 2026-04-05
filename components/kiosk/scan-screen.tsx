@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { StatusBar } from "@/components/kiosk/status-bar";
 import { CurrentMealDisplay } from "@/components/kiosk/current-meal-display";
 import { IdleScreen } from "@/components/kiosk/idle-screen";
@@ -40,6 +40,7 @@ interface PendingModal {
   btegId?: string;
   message: string;
   existingLog?: MealLog;
+  assignedLocationId?: number | null;
 }
 
 export function ScanScreen() {
@@ -48,6 +49,7 @@ export function ScanScreen() {
     useState<ConfirmationResult | null>(null);
   const [pendingModal, setPendingModal] = useState<PendingModal | null>(null);
   const { activeMeals } = useCurrentMeal();
+  const lastScannedRef = useRef<{ code: string; time: number } | null>(null);
 
   const currentMeal = activeMeals.length > 0 ? activeMeals[0] : null;
 
@@ -77,6 +79,7 @@ export function ScanScreen() {
       isExtraServing: boolean;
       mealType: string;
       isManualOverride: boolean;
+      isWrongLocation?: boolean;
     }) => {
       if (!diningHallId) return;
 
@@ -93,6 +96,7 @@ export function ScanScreen() {
         syncStatus: "pending",
         isExtraServing: params.isExtraServing,
         isManualOverride: params.isManualOverride,
+        isWrongLocation: params.isWrongLocation || false,
         chefId: activeChefId ? Number(activeChefId) : null,
         deviceUuid: deviceUuid ?? null,
         syncKey: generateSyncKey(
@@ -108,15 +112,31 @@ export function ScanScreen() {
 
   const handleScan = useCallback(
     async (code: string) => {
-      if (scanState === "processing" || !currentMeal) {
-        if (!currentMeal) {
-          setConfirmationResult({
-            type: "warning",
-            title: "Хоолны цаг биш",
-            message: "Одоогоор хоолны цаг эхлээгүй байна",
-          });
-          setScanState("result");
-        }
+      const now = Date.now();
+
+      if (scanState === "processing") return;
+
+      if (
+        lastScannedRef.current &&
+        lastScannedRef.current.code === code &&
+        now - lastScannedRef.current.time < 3000
+      ) {
+        console.log("3 секундын доторх давхар скан хаагдлаа");
+        return;
+      }
+      lastScannedRef.current = { code, time: now };
+      setScanState("processing");
+
+      setPendingModal(null);
+      setConfirmationResult(null);
+
+      if (!currentMeal) {
+        setConfirmationResult({
+          type: "warning",
+          title: "Хоолны цаг биш",
+          message: "Одоогоор хоолны цаг эхлээгүй байна",
+        });
+        setScanState("result");
         return;
       }
 
@@ -238,48 +258,105 @@ export function ScanScreen() {
         }
 
         // 4. Гал тогооны зөвшөөрөл шалгах
+        // const today = getLocalDate();
+        // const override = await db.mealLocationOverrides
+        //   .where("[userId+date+mealType]")
+        //   .equals([employee.id, today, targetMealType])
+        //   .first();
+
+        // if (override) {
+        //   if (diningHallId && override.diningHallId !== Number(diningHallId)) {
+        //     const targetHall = await db.diningHalls.get(override.diningHallId);
+        //     playSound("error");
+        //     setConfirmationResult({
+        //       type: "error",
+        //       title: "Шилжүүлсэн",
+        //       message: `${employee.name} өнөөдөр "${targetHall?.name ?? override.diningHallId}" руу шилжүүлсэн`,
+        //       employeeName: employee.name,
+        //     });
+        //     setScanState("result");
+        //     return;
+        //   }
+        // } else {
+        //   const config = await db.userMealConfigs.get(employee.id);
+        //   const location = config
+        //     ? getMealLocationForSlot(config, targetMealType)
+        //     : null;
+
+        //   if (
+        //     !config ||
+        //     location === null ||
+        //     (location !== "skip" &&
+        //       diningHallId &&
+        //       location !== Number(diningHallId))
+        //   ) {
+        //     setPendingModal({
+        //       type: "unauthorized",
+        //       employee,
+        //       btegId: lookupBteg || "",
+        //       scannedCode: lookupIdCard || code,
+        //       message: `${employee.name} энэ гал тогоонд бүртгэлгүй`,
+        //     });
+        //     setScanState("idle");
+        //     return;
+        //   }
+        // }
+
+        // 4. Гал тогооны зөвшөөрөл шалгах
+
         const today = getLocalDate();
         const override = await db.mealLocationOverrides
           .where("[userId+date+mealType]")
           .equals([employee.id, today, targetMealType])
           .first();
 
+        let assignedLocationId: number | null = null;
+
         if (override) {
-          if (diningHallId && override.diningHallId !== Number(diningHallId)) {
-            const targetHall = await db.diningHalls.get(override.diningHallId);
-            playSound("error");
-            setConfirmationResult({
-              type: "error",
-              title: "Шилжүүлсэн",
-              message: `${employee.name} өнөөдөр "${targetHall?.name ?? override.diningHallId}" руу шилжүүлсэн`,
-              employeeName: employee.name,
-            });
-            setScanState("result");
-            return;
-          }
+          assignedLocationId = override.diningHallId;
         } else {
           const config = await db.userMealConfigs.get(employee.id);
           const location = config
             ? getMealLocationForSlot(config, targetMealType)
             : null;
 
-          if (
-            !config ||
-            location === null ||
-            (location !== "skip" &&
-              diningHallId &&
-              location !== Number(diningHallId))
-          ) {
-            setPendingModal({
-              type: "unauthorized",
-              employee,
-              btegId: lookupBteg || "",
-              scannedCode: lookupIdCard || code,
-              message: `${employee.name} энэ гал тогоонд бүртгэлгүй`,
-            });
-            setScanState("idle");
-            return;
+          if (location !== "skip" && location !== null) {
+            assignedLocationId = Number(location);
           }
+        }
+
+        // Хэрэв тухайн хүн энэ гал тогоонд биш өөр гал тогоонд бүртгэлтэй бол:
+        if (
+          assignedLocationId !== null &&
+          diningHallId &&
+          assignedLocationId !== Number(diningHallId)
+        ) {
+          // Бүртгэлтэй гал тогооны нэрийг хайж олох
+          const targetHall = await db.diningHalls.get(assignedLocationId);
+          const targetHallName =
+            targetHall?.name ?? `Гал тогоо #${assignedLocationId}`;
+
+          setPendingModal({
+            type: "unauthorized", // Энэ нь ScanModal-ийг дуудаж "Гараар зөвшөөрөх" товчийг гаргана
+            employee,
+            assignedLocationId,
+            btegId: lookupBteg || "",
+            scannedCode: lookupIdCard || code,
+            message: `${employee.name} нь "${targetHallName}"-д хуваарьтай байна. Энд гараар зөвшөөрөх үү?`,
+          });
+          setScanState("idle");
+          return;
+        } else if (assignedLocationId === null) {
+          // Ямар ч гал тогооны тохиргоо байхгүй үед (config байхгүй эсвэл "skip" байвал)
+          setPendingModal({
+            type: "unauthorized",
+            employee,
+            btegId: lookupBteg || "",
+            scannedCode: lookupIdCard || code,
+            message: `${employee.name} энэ хоолонд бүртгэлгүй байна.`,
+          });
+          setScanState("idle");
+          return;
         }
 
         // 5. Давхардал шалгах
@@ -336,12 +413,17 @@ export function ScanScreen() {
     const today = getLocalDate();
     const employee = pendingModal.employee;
 
+    const isWrongLocation =
+      pendingModal.assignedLocationId !== null &&
+      pendingModal.assignedLocationId !== Number(diningHallId);
+
     if (employee) {
       await doCreateLog({
         employee,
         isExtraServing: false,
         mealType: currentMeal.mealType,
         isManualOverride: true,
+        isWrongLocation,
       });
     } else {
       await createMealLog({
@@ -356,6 +438,7 @@ export function ScanScreen() {
         syncStatus: "pending",
         isExtraServing: false,
         isManualOverride: true,
+        isWrongLocation: false,
         chefId: activeChefId ? Number(activeChefId) : null,
         deviceUuid: deviceUuid ?? null,
         syncKey: `manual-${pendingModal.scannedCode}-${today}-${Date.now()}`,
@@ -403,7 +486,7 @@ export function ScanScreen() {
 
   useBarcodeScanner({
     onScan: handleScan,
-    enabled: scanState !== "processing" && !pendingModal,
+    enabled: scanState !== "processing",
   });
 
   return (

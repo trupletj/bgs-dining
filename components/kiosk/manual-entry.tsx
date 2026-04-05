@@ -5,7 +5,11 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db, type Employee, type MealLog } from "@/lib/db";
 import { useCurrentMeal } from "@/hooks/use-current-meal";
 import { useKioskConfig } from "@/hooks/use-kiosk-config";
-import { createMealLog, checkDuplicateMealLog } from "@/hooks/use-meal-logs";
+import {
+  createMealLog,
+  checkDuplicateMealLog,
+  checkAssignedLocation,
+} from "@/hooks/use-meal-logs";
 import { getLocalDate, KIOSK_CONFIG_KEYS } from "@/lib/constants";
 import {
   Dialog,
@@ -21,6 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { UserPlus, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getMealLocationForSlot } from "@/lib/meal-type-map";
 
 interface DuplicateInfo {
   employee: Employee;
@@ -59,12 +64,6 @@ export function ManualEntry() {
   }, [allEmployees, search]);
 
   const handleSelect = async (employee: Employee) => {
-    console.log(
-      "current meal in manual entry:",
-      currentMeal,
-      "and dining hall:",
-      diningHallId,
-    );
     if (!currentMeal || !diningHallId) {
       toast.error("Хоолны цаг эсвэл гал тогоо тохируулаагүй");
       return;
@@ -81,6 +80,18 @@ export function ManualEntry() {
       return;
     }
 
+    const { isWrongLocation, assignedHallName } = await checkAssignedLocation(
+      employee.id,
+      currentMeal.mealType,
+      Number(diningHallId),
+    );
+
+    if (isWrongLocation) {
+      toast.warning(
+        `${employee.name} нь "${assignedHallName}"-д хуваарьтай байна!`,
+      );
+    }
+
     await createMealLog({
       userId: employee.id,
       btegId: employee.employeeCode,
@@ -93,6 +104,7 @@ export function ManualEntry() {
       syncStatus: "pending",
       isExtraServing: false,
       isManualOverride: true,
+      isWrongLocation: isWrongLocation,
       chefId: activeChefId ? Number(activeChefId) : null,
       deviceUuid: deviceUuid ?? null,
       syncKey: `manual-${employee.id}-${currentMeal.id}-${today}-${Date.now()}`,
@@ -108,7 +120,17 @@ export function ManualEntry() {
     const { employee } = duplicate;
     const today = getLocalDate();
 
-    console.log("Adding extra serving for employee:", employee);
+    const { isWrongLocation, assignedHallName } = await checkAssignedLocation(
+      employee.id,
+      currentMeal.mealType,
+      Number(diningHallId),
+    );
+
+    if (isWrongLocation) {
+      toast.warning(
+        `${employee.name} нь "${assignedHallName}"-д хуваарьтай байна!`,
+      );
+    }
 
     await createMealLog({
       userId: employee.id,
@@ -122,6 +144,7 @@ export function ManualEntry() {
       syncStatus: "pending",
       isExtraServing: true,
       isManualOverride: true,
+      isWrongLocation: isWrongLocation,
       chefId: activeChefId ? Number(activeChefId) : null,
       deviceUuid: deviceUuid ?? null,
       syncKey: `manual-${employee.id}-${currentMeal.id}-${today}-extra-${Date.now()}`,

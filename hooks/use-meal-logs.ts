@@ -2,6 +2,8 @@
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, type MealLog } from "@/lib/db";
+import { getLocalDate } from "@/lib/constants";
+import { getMealLocationForSlot } from "@/lib/meal-type-map";
 
 interface MealLogFilters {
   date?: string;
@@ -85,4 +87,47 @@ export async function checkDuplicateMealLog(
 export async function createMealLog(log: Omit<MealLog, "id">): Promise<number> {
   const id = await db.mealLogs.add(log);
   return id as number;
+}
+
+export async function checkAssignedLocation(
+  userId: string,
+  mealType: string,
+  currentDiningHallId: number,
+) {
+  const today = getLocalDate();
+
+  // 1. Override шалгах
+  const override = await db.mealLocationOverrides
+    .where("[userId+date+mealType]")
+    .equals([userId, today, mealType])
+    .first();
+
+  let assignedLocationId: number | null = null;
+
+  if (override) {
+    assignedLocationId = override.diningHallId;
+  } else {
+    const config = await db.userMealConfigs.get(userId);
+    const location = config ? getMealLocationForSlot(config, mealType) : null;
+
+    if (location !== "skip" && location !== null) {
+      assignedLocationId = Number(location);
+    }
+  }
+
+  const isWrongLocation =
+    assignedLocationId !== null && assignedLocationId !== currentDiningHallId;
+
+  // Гал тогооны нэрийг авах
+  let assignedHallName = "";
+  if (assignedLocationId) {
+    const hall = await db.diningHalls.get(assignedLocationId);
+    assignedHallName = hall?.name ?? `Гал тогоо #${assignedLocationId}`;
+  }
+
+  return {
+    isWrongLocation,
+    assignedLocationId,
+    assignedHallName,
+  };
 }

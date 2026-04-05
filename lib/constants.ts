@@ -129,8 +129,6 @@ export function getAllowedMealTypesForShift(
   const isBetween = (val: number, min: number, max: number) =>
     val >= min && val <= max;
 
-  console.log(`Scan Hour: ${currentHour}, Shift: ${startHour} - ${endHour}`);
-
   /**
    * АСУУДЛЫН ШИЙДЭЛ:
    * Хэрэв одоо өглөө (06-11 цаг) байхад ажилчны ээлж орой (18-20 цагт) эхлэх гэж байгаа бол
@@ -165,6 +163,11 @@ export function getAllowedMealTypesForShift(
   // 5. Өдрийн дунд ээлж: 12/13 - 18/19
   if (isBetween(startHour, 12, 13) && isBetween(endHour, 18, 19)) {
     return ["lunch", "dinner"];
+  }
+
+  // 6. Харуулын диспичер: 12/13 - 7/8
+  if (isBetween(startHour, 12, 13) && isBetween(endHour, 7, 8)) {
+    return ["lunch", "dinner", "night_meal", "morning_meal"];
   }
 
   return [];

@@ -405,6 +405,7 @@ export async function pushMealLogs(): Promise<number> {
         chef_id: log.chefId,
         is_extra_serving: log.isExtraServing,
         is_manual_override: log.isManualOverride,
+        is_wrong_location: log.isWrongLocation,
         device_uuid: log.deviceUuid,
         sync_key: log.syncKey,
       }));

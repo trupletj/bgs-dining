@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { useCurrentMeal } from "@/hooks/use-current-meal";
 import { useKioskConfig } from "@/hooks/use-kiosk-config";
 import {
+  getAllowedMealTypesForShift,
   KIOSK_CONFIG_KEYS,
   MEAL_NAME_MAP,
   MEAL_TYPE_COLUMN_MAP,
@@ -27,30 +28,93 @@ export function ChefDashboard({ mealSlot }: ChefDashboardProps) {
     [currentTime],
   );
 
+  // Meal log counts
+  const counts = useLiveQuery(async () => {
+    if (!mealSlot || !diningHallId)
+      return { servedPlan: 0, manual: 0, extra: 0, totalServed: 0 };
+
+    const hallId = Number(diningHallId);
+
+    const logs = await db.mealLogs
+      .where("date")
+      .equals(today)
+      .filter(
+        (l) => l.mealType === mealSlot.mealType && l.diningHallId === hallId,
+      )
+      .toArray();
+
+    return logs.reduce(
+      (acc, log) => {
+        acc.totalServed++;
+
+        if (log.isExtraServing) {
+          acc.extra++;
+        } else {
+          acc.servedPlan++;
+        }
+
+        if (log.isManualOverride) {
+          acc.manual++;
+        }
+
+        return acc;
+      },
+      { servedPlan: 0, manual: 0, extra: 0, totalServed: 0 },
+    );
+  }, [mealSlot?.mealType, diningHallId, today]);
+
   const expected = useLiveQuery(async () => {
     if (!mealSlot || !diningHallId) return 0;
 
     const hallId = Number(diningHallId);
     const columnName = MEAL_TYPE_COLUMN_MAP[mealSlot.mealType];
-    const todayStr = today; // Гаднаас ирж буй өнөөдрийн огноо
+    const todayStr = today;
 
-    let defaultCount: number;
+    // 1. Бүх ажилчдын мэдээллийг татаж Map болгох (цагийн хуваарь шалгахад хурдан болгоно)
+    const employees = await db.employees.toArray();
+    const employeeMap = new Map(employees.map((e) => [e.id, e]));
+
+    // Туслах функц: Хэрэглэгч тухайн хоолыг идэх эрхтэй эсэхийг цагийн хуваариар нь шалгах
+    const isUserAllowed = (userId: string) => {
+      const emp = employeeMap.get(userId);
+      if (!emp || !emp.isActive || !emp.shiftStart || !emp.shiftEnd)
+        return false;
+
+      const allowedMeals = getAllowedMealTypesForShift(
+        emp.shiftStart,
+        emp.shiftEnd,
+        currentTime,
+      );
+      return allowedMeals.includes(mealSlot.mealType);
+    };
+
+    // 2. Үндсэн тохиргооноос (Default) шүүх
+    let defaultConfigs = [];
     if (!columnName) {
-      defaultCount = await db.userMealConfigs.count();
+      defaultConfigs = await db.userMealConfigs.toArray();
     } else {
-      defaultCount = await db.userMealConfigs
+      defaultConfigs = await db.userMealConfigs
         .where(columnName)
         .equals(hallId)
-        .count();
+        .toArray();
     }
+    const validDefaultCount = defaultConfigs.filter((c) =>
+      isUserAllowed(c.userId),
+    ).length;
 
-    const incoming = await db.mealLocationOverrides
+    // 3. Өөр газраас ирж идэх хүмүүс (Incoming Overrides)
+    const incomingOverrides = await db.mealLocationOverrides
       .where("[date+diningHallId]")
       .equals([todayStr, hallId])
       .filter((o) => o.mealType === mealSlot.mealType)
-      .count();
+      .toArray();
 
-    let outgoing = 0;
+    const validIncomingCount = incomingOverrides.filter((o) =>
+      isUserAllowed(o.userId),
+    ).length;
+
+    // 4. Манайхаас өөр газар луу явсан хүмүүс (Outgoing Overrides)
+    let validOutgoingCount = 0;
     if (columnName) {
       const awayOverrides = await db.mealLocationOverrides
         .where("date")
@@ -63,45 +127,25 @@ export function ChefDashboard({ mealSlot }: ChefDashboardProps) {
       if (awayOverrides.length > 0) {
         const overriddenUserIds = awayOverrides.map((o) => o.userId);
 
-        outgoing = await db.userMealConfigs
+        const awayConfigs = await db.userMealConfigs
           .where("userId")
           .anyOf(overriddenUserIds)
           .and((config) => config[columnName as keyof typeof config] === hallId)
-          .count();
+          .toArray();
+
+        validOutgoingCount = awayConfigs.filter((c) =>
+          isUserAllowed(c.userId),
+        ).length;
       }
     }
 
-    return defaultCount + incoming - outgoing;
-  }, [mealSlot?.id, diningHallId, today]);
-
-  // Meal log counts for today + current meal + this dining hall
-  const counts = useLiveQuery(async () => {
-    if (!mealSlot || !diningHallId) return { served: 0, manual: 0, extra: 0 };
-
-    const hallId = Number(diningHallId);
-
-    const logs = await db.mealLogs
-      .where("date")
-      .equals(today)
-      .filter(
-        (l) => l.mealType === mealSlot.mealType && l.diningHallId === hallId,
-      )
-      .toArray();
-
-    // Reduce ашиглан нэг удаагийн давталтаар тооцох
-    return logs.reduce(
-      (acc, log) => {
-        acc.served++;
-        if (log.isManualOverride) acc.manual++;
-        if (log.isExtraServing) acc.extra++;
-        return acc;
-      },
-      { served: 0, manual: 0, extra: 0 },
-    );
-  }, [mealSlot?.mealType, diningHallId, today]);
+    return validDefaultCount + validIncomingCount - validOutgoingCount;
+  }, [mealSlot?.id, diningHallId, today, currentTime]);
 
   const expectedCount = expected ?? 0;
-  const servedCount = counts?.served ?? 0;
+  const servedCount = counts?.servedPlan ?? 0;
+  const actualPlatesOut = counts?.totalServed ?? 0;
+
   const manualCount = counts?.manual ?? 0;
   const extraCount = counts?.extra ?? 0;
   const remaining = Math.max(0, expectedCount - servedCount);
@@ -110,7 +154,6 @@ export function ChefDashboard({ mealSlot }: ChefDashboardProps) {
     expectedCount > 0
       ? Math.min(100, Math.round((servedCount / expectedCount) * 100))
       : 0;
-
   if (!mealSlot) {
     return (
       <div className="relative flex shrink-0 flex-col gap-3 border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-4 py-8 shadow-lg items-center justify-center">

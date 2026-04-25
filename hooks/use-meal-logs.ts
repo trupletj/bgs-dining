@@ -61,41 +61,24 @@ export function usePendingSyncCount() {
 export async function checkDuplicateMealLog(
   userId: string,
   mealType: string,
-  identifier?: string,
+  idcardNumber?: string,
 ): Promise<MealLog | undefined> {
-  // 6 цагийн доторх бичлэгийг л давхардал гэж үзнэ
   const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
 
-  // 1. Хэрэв userId байгаа бол (Бүртгэлтэй ажилтан)
   if (userId && userId !== "") {
-    const logByUserId = await db.mealLogs
+    return await db.mealLogs
       .where("userId")
       .equals(userId)
       .and((log) => log.mealType === mealType && log.scannedAt > sixHoursAgo)
       .first();
-
-    if (logByUserId) return logByUserId;
   }
 
-  // 2. Хэрэв identifier байгаа бол (Бүртгэлгүй ажилтан эсвэл userId-аар олдоогүй үед)
-  if (identifier && identifier !== "") {
-    // idcardNumber-ээр хайх
-    const logByIdCard = await db.mealLogs
+  if (idcardNumber) {
+    return await db.mealLogs
       .where("idcardNumber")
-      .equals(identifier)
+      .equals(idcardNumber)
       .and((log) => log.mealType === mealType && log.scannedAt > sixHoursAgo)
       .first();
-
-    if (logByIdCard) return logByIdCard;
-
-    // Хэрэв idcardNumber-ээр олдоогүй бол btegId-аар хайх (Нэмэлт хамгаалалт)
-    const logByBteg = await db.mealLogs
-      .where("btegId")
-      .equals(identifier)
-      .and((log) => log.mealType === mealType && log.scannedAt > sixHoursAgo)
-      .first();
-
-    return logByBteg;
   }
 
   return undefined;

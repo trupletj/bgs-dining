@@ -190,6 +190,27 @@ export function ScanScreen() {
 
         // 3. Ажилтан олдохгүй бол
         if (!employee) {
+          const existingUnregistered = await checkDuplicateMealLog(
+            "", // userId байхгүй
+            currentMeal.mealType,
+            lookupIdCard || lookupBteg || "", // QR-ын дугаараар хайх
+          );
+
+          if (existingUnregistered) {
+            setPendingModal({
+              type: "double-scan",
+              employee: { name: "Бүртгэлгүй ажилтан", id: "" } as Employee, // Dummy объект
+              btegId: lookupBteg || "",
+              scannedCode: lookupIdCard || code,
+              assignedLocationId: null,
+              targetMealType: currentMeal.mealType,
+              message: "Энэ бүртгэлгүй ажилтан аль хэдийн бүртгүүлсэн байна",
+              existingLog: existingUnregistered,
+            });
+            setScanState("idle");
+            return;
+          }
+
           setPendingModal({
             type: "unauthorized",
             btegId: lookupBteg || "",

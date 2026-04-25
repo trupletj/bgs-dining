@@ -116,12 +116,12 @@ export function ScanScreen() {
 
       if (scanState === "processing") return;
 
+      // 3 секундын доторх давхар скан хаах
       if (
         lastScannedRef.current &&
         lastScannedRef.current.code === code &&
         now - lastScannedRef.current.time < 3000
       ) {
-        console.log("3 секундын доторх давхар скан хаагдлаа");
         return;
       }
       lastScannedRef.current = { code, time: now };
@@ -139,8 +139,6 @@ export function ScanScreen() {
         setScanState("result");
         return;
       }
-
-      setScanState("processing");
 
       try {
         // 1. QR код задлах
@@ -189,17 +187,20 @@ export function ScanScreen() {
             .first();
         }
 
+        // 3. Ажилтан олдохгүй бол
         if (!employee) {
           setPendingModal({
             type: "unauthorized",
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
+            assignedLocationId: null, // Мэдээлэл байхгүй үед null дамжуулна
             message: "Бүртгэлгүй ажилтан",
           });
           setScanState("idle");
           return;
         }
 
+        // 4. Идэвхгүй ажилтан
         if (!employee.isActive) {
           playSound("error");
           setConfirmationResult({
@@ -212,6 +213,7 @@ export function ScanScreen() {
           return;
         }
 
+        // 5. Хоол идэх эрх шалгах (Shift)
         const allowedMeals = getAllowedMealTypesForShift(
           employee.shiftStart,
           employee.shiftEnd,
@@ -219,25 +221,20 @@ export function ScanScreen() {
         );
         let targetMealType = currentMeal.mealType;
 
+        // Хоолны төрөл хөрвүүлэх (Extend Lunch, Morning Meal гэх мэт)
         if (!allowedMeals.includes(targetMealType)) {
-          // 1. Өдрийн хоолыг Extend Lunch рүү хөрвүүлэх
           if (
             targetMealType === "lunch" &&
             allowedMeals.includes("extend_lunch")
           ) {
             targetMealType = "extend_lunch";
-          }
-
-          // 2. Өглөөний хоолыг Extend Morning Meal рүү хөрвүүлэх
-          else if (
+          } else if (
             (targetMealType === "breakfast" ||
               targetMealType === "morning_meal") &&
             allowedMeals.includes("extend_morning_meal")
           ) {
             targetMealType = "extend_morning_meal";
-          }
-          // 3. Өглөөний хоолыг Morning Meal рүү хөрвүүлэх (Шөнийн ээлжийнхэнд зориулсан)
-          else if (
+          } else if (
             targetMealType === "breakfast" &&
             allowedMeals.includes("morning_meal")
           ) {
@@ -251,59 +248,14 @@ export function ScanScreen() {
             employee,
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
-            message: `${employee.name} одоо идэвхтэй байгаа (${MEAL_NAME_MAP[targetMealType as keyof typeof MEAL_NAME_MAP] || targetMealType}) хоолыг идэх хуваарьгүй байна.`,
+            assignedLocationId: null,
+            message: `${employee.name} энэ хоолыг (${MEAL_NAME_MAP[targetMealType] || targetMealType}) идэх хуваарьгүй байна.`,
           });
           setScanState("idle");
           return;
         }
 
-        // 4. Гал тогооны зөвшөөрөл шалгах
-        // const today = getLocalDate();
-        // const override = await db.mealLocationOverrides
-        //   .where("[userId+date+mealType]")
-        //   .equals([employee.id, today, targetMealType])
-        //   .first();
-
-        // if (override) {
-        //   if (diningHallId && override.diningHallId !== Number(diningHallId)) {
-        //     const targetHall = await db.diningHalls.get(override.diningHallId);
-        //     playSound("error");
-        //     setConfirmationResult({
-        //       type: "error",
-        //       title: "Шилжүүлсэн",
-        //       message: `${employee.name} өнөөдөр "${targetHall?.name ?? override.diningHallId}" руу шилжүүлсэн`,
-        //       employeeName: employee.name,
-        //     });
-        //     setScanState("result");
-        //     return;
-        //   }
-        // } else {
-        //   const config = await db.userMealConfigs.get(employee.id);
-        //   const location = config
-        //     ? getMealLocationForSlot(config, targetMealType)
-        //     : null;
-
-        //   if (
-        //     !config ||
-        //     location === null ||
-        //     (location !== "skip" &&
-        //       diningHallId &&
-        //       location !== Number(diningHallId))
-        //   ) {
-        //     setPendingModal({
-        //       type: "unauthorized",
-        //       employee,
-        //       btegId: lookupBteg || "",
-        //       scannedCode: lookupIdCard || code,
-        //       message: `${employee.name} энэ гал тогоонд бүртгэлгүй`,
-        //     });
-        //     setScanState("idle");
-        //     return;
-        //   }
-        // }
-
-        // 4. Гал тогооны зөвшөөрөл шалгах
-
+        // 6. Байршил (Dining Hall) шалгах
         const today = getLocalDate();
         const override = await db.mealLocationOverrides
           .where("[userId+date+mealType]")
@@ -311,7 +263,6 @@ export function ScanScreen() {
           .first();
 
         let assignedLocationId: number | null = null;
-
         if (override) {
           assignedLocationId = override.diningHallId;
         } else {
@@ -319,27 +270,25 @@ export function ScanScreen() {
           const location = config
             ? getMealLocationForSlot(config, targetMealType)
             : null;
-
           if (location !== "skip" && location !== null) {
             assignedLocationId = Number(location);
           }
         }
 
-        // Хэрэв тухайн хүн энэ гал тогоонд биш өөр гал тогоонд бүртгэлтэй бол:
+        // Буруу байршил бол Modal гаргах
         if (
           assignedLocationId !== null &&
           diningHallId &&
           assignedLocationId !== Number(diningHallId)
         ) {
-          // Бүртгэлтэй гал тогооны нэрийг хайж олох
           const targetHall = await db.diningHalls.get(assignedLocationId);
           const targetHallName =
             targetHall?.name ?? `Гал тогоо #${assignedLocationId}`;
 
           setPendingModal({
-            type: "unauthorized", // Энэ нь ScanModal-ийг дуудаж "Гараар зөвшөөрөх" товчийг гаргана
+            type: "unauthorized",
             employee,
-            assignedLocationId,
+            assignedLocationId, // Зөв байршлыг дамжуулж байна
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
             message: `${employee.name} нь "${targetHallName}"-д хуваарьтай байна. Энд гараар зөвшөөрөх үү?`,
@@ -347,10 +296,10 @@ export function ScanScreen() {
           setScanState("idle");
           return;
         } else if (assignedLocationId === null) {
-          // Ямар ч гал тогооны тохиргоо байхгүй үед (config байхгүй эсвэл "skip" байвал)
           setPendingModal({
             type: "unauthorized",
             employee,
+            assignedLocationId: null,
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
             message: `${employee.name} энэ хоолонд бүртгэлгүй байна.`,
@@ -359,9 +308,9 @@ export function ScanScreen() {
           return;
         }
 
-        // 5. Давхардал шалгах
+        // 7. Давхардал шалгах
         const existing = await checkDuplicateMealLog(
-          employee?.id || "",
+          employee.id,
           targetMealType,
           lookupIdCard || "",
         );
@@ -371,6 +320,7 @@ export function ScanScreen() {
             employee,
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
+            assignedLocationId,
             message: `${employee.name} аль хэдийн бүртгүүлсэн`,
             existingLog: existing,
           });
@@ -378,7 +328,7 @@ export function ScanScreen() {
           return;
         }
 
-        // 6. Амжилттай бүртгэх
+        // 8. Амжилттай бүртгэх
         await doCreateLog({
           employee,
           isExtraServing: false,
@@ -411,19 +361,38 @@ export function ScanScreen() {
     if (!pendingModal || !currentMeal || !diningHallId) return;
 
     const today = getLocalDate();
-    const employee = pendingModal.employee;
+    let employee = pendingModal.employee;
+    let assignedLocationId = pendingModal.assignedLocationId;
+
+    if (!employee && pendingModal.btegId) {
+      employee = await db.employees
+        .where("employeeCode")
+        .equals(pendingModal.btegId)
+        .first();
+
+      if (employee) {
+        const config = await db.userMealConfigs.get(employee.id);
+        const location = config
+          ? getMealLocationForSlot(config, currentMeal.mealType)
+          : null;
+        if (location !== "skip" && location !== null) {
+          assignedLocationId = Number(location);
+        }
+      }
+    }
 
     const isWrongLocation =
-      pendingModal.assignedLocationId !== null &&
-      pendingModal.assignedLocationId !== Number(diningHallId);
+      assignedLocationId !== null &&
+      assignedLocationId !== Number(diningHallId);
 
     if (employee) {
+      // Системд байгаа ажилтан
       await doCreateLog({
         employee,
         isExtraServing: false,
         mealType: currentMeal.mealType,
         isManualOverride: true,
-        isWrongLocation,
+        isWrongLocation, // Одоо энд зөв утга орно (true/false)
       });
     } else {
       await createMealLog({
@@ -438,7 +407,7 @@ export function ScanScreen() {
         syncStatus: "pending",
         isExtraServing: false,
         isManualOverride: true,
-        isWrongLocation: false,
+        isWrongLocation: isWrongLocation, // Мэдээлэл байхгүй бол false байна
         chefId: activeChefId ? Number(activeChefId) : null,
         deviceUuid: deviceUuid ?? null,
         syncKey: `manual-${pendingModal.scannedCode}-${today}-${Date.now()}`,
@@ -449,7 +418,9 @@ export function ScanScreen() {
     setConfirmationResult({
       type: "success",
       title: "Гараар зөвшөөрлөө",
-      message: "Бүртгэл хадгалагдлаа",
+      message: isWrongLocation
+        ? "Буруу байршилд бүртгэгдлээ"
+        : "Бүртгэл хадгалагдлаа",
       employeeName: employee?.name ?? "Бүртгэлгүй ажилтан",
       mealName: getMealName(currentMeal.mealType),
     });

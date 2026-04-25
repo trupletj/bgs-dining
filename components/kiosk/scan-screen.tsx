@@ -41,6 +41,7 @@ interface PendingModal {
   message: string;
   existingLog?: MealLog;
   assignedLocationId?: number | null;
+  targetMealType?: string;
 }
 
 export function ScanScreen() {
@@ -321,6 +322,7 @@ export function ScanScreen() {
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
             assignedLocationId,
+            targetMealType: targetMealType,
             message: `${employee.name} аль хэдийн бүртгүүлсэн`,
             existingLog: existing,
           });
@@ -437,10 +439,12 @@ export function ScanScreen() {
   const handleAddExtraServing = useCallback(async () => {
     if (!pendingModal?.employee || !currentMeal) return;
 
+    const correctMealType = pendingModal.targetMealType || currentMeal.mealType;
+
     await doCreateLog({
       employee: pendingModal.employee,
       isExtraServing: true,
-      mealType: currentMeal.mealType,
+      mealType: correctMealType,
       isManualOverride: false,
     });
 
@@ -450,7 +454,7 @@ export function ScanScreen() {
       title: "Нэмэлт порц",
       message: "Нэмэлт порц бүртгэгдлээ",
       employeeName: pendingModal.employee.name,
-      mealName: getMealName(currentMeal.mealType),
+      mealName: getMealName(correctMealType),
     });
     setScanState("result");
   }, [pendingModal, currentMeal, doCreateLog]);

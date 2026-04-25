@@ -193,7 +193,7 @@ export function ScanScreen() {
           const existingUnregistered = await checkDuplicateMealLog(
             "", // userId байхгүй
             currentMeal.mealType,
-            lookupIdCard || lookupBteg || "", // QR-ын дугаараар хайх
+            lookupIdCard || "", // QR-ын дугаараар хайх
           );
 
           if (existingUnregistered) {

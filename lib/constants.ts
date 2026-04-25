@@ -192,3 +192,34 @@ export const getLocalDate = (): string => {
     timeZone: "Asia/Ulaanbaatar",
   }).format(new Date());
 };
+
+export function resolveTargetMealType(
+  allowedMeals: string[],
+  currentMealType: string,
+): string {
+  if (allowedMeals.includes(currentMealType)) {
+    return currentMealType;
+  }
+
+  if (currentMealType === "lunch" && allowedMeals.includes("extend_lunch")) {
+    return "extend_lunch";
+  }
+
+  // 3. Breakfast/Morning -> Extend Morning Meal хөрвүүлэлт
+  const isBreakfastSlot =
+    currentMealType === "breakfast" || currentMealType === "morning_meal";
+  if (isBreakfastSlot && allowedMeals.includes("extend_morning_meal")) {
+    return "extend_morning_meal";
+  }
+
+  // 4. Breakfast -> Morning Meal (ердийн шөнийн ээлж бууж байгаа бол)
+  if (
+    currentMealType === "breakfast" &&
+    allowedMeals.includes("morning_meal")
+  ) {
+    return "morning_meal";
+  }
+
+  // Хэрэв ямар ч тохирох зүйл олдохгүй бол үндсэн төрлийг буцаана (Энэ нь дараагийн шатны unauthorized шалгалт дээр унана)
+  return currentMealType;
+}

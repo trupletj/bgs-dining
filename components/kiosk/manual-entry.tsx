@@ -10,7 +10,12 @@ import {
   checkDuplicateMealLog,
   checkAssignedLocation,
 } from "@/hooks/use-meal-logs";
-import { getLocalDate, KIOSK_CONFIG_KEYS } from "@/lib/constants";
+import {
+  getAllowedMealTypesForShift,
+  getLocalDate,
+  KIOSK_CONFIG_KEYS,
+  resolveTargetMealType,
+} from "@/lib/constants";
 import {
   Dialog,
   DialogContent,
@@ -70,11 +75,24 @@ export function ManualEntry() {
     }
 
     const today = getLocalDate();
+
+    const allowedMeals = getAllowedMealTypesForShift(
+      employee.shiftStart,
+      employee.shiftEnd,
+      new Date(),
+    );
+
+    const targetMealType = resolveTargetMealType(
+      allowedMeals,
+      currentMeal.mealType,
+    );
+
     const existing = await checkDuplicateMealLog(
       employee.id,
-      currentMeal.mealType,
+      targetMealType, // Хөрвүүлсэн төрлөөр
       today,
     );
+
     if (existing) {
       setDuplicate({ employee, existingLog: existing });
       return;
@@ -82,7 +100,7 @@ export function ManualEntry() {
 
     const { isWrongLocation, assignedHallName } = await checkAssignedLocation(
       employee.id,
-      currentMeal.mealType,
+      targetMealType, // Хөрвүүлсэн төрлөөр
       Number(diningHallId),
     );
 
@@ -97,17 +115,17 @@ export function ManualEntry() {
       btegId: employee.employeeCode,
       idcardNumber: employee.idcardNumber,
       employeeName: employee.name,
-      mealType: currentMeal.mealType,
+      mealType: targetMealType, // Хөрвүүлсэн төрөл
       diningHallId: Number(diningHallId),
       date: today,
       scannedAt: new Date().toISOString(),
       syncStatus: "pending",
       isExtraServing: false,
-      isManualOverride: true,
+      isManualOverride: true, // Гараар учраас true
       isWrongLocation: isWrongLocation,
       chefId: activeChefId ? Number(activeChefId) : null,
       deviceUuid: deviceUuid ?? null,
-      syncKey: `manual-${employee.id}-${currentMeal.id}-${today}-${Date.now()}`,
+      syncKey: `manual-${employee.id}-${targetMealType}-${today}-${Date.now()}`,
     });
 
     setOpen(false);
@@ -120,34 +138,39 @@ export function ManualEntry() {
     const { employee } = duplicate;
     const today = getLocalDate();
 
-    const { isWrongLocation, assignedHallName } = await checkAssignedLocation(
-      employee.id,
-      currentMeal.mealType,
-      Number(diningHallId),
+    const allowedMeals = getAllowedMealTypesForShift(
+      employee.shiftStart,
+      employee.shiftEnd,
+      new Date(),
     );
 
-    if (isWrongLocation) {
-      toast.warning(
-        `${employee.name} нь "${assignedHallName}"-д хуваарьтай байна!`,
-      );
-    }
+    const targetMealType = resolveTargetMealType(
+      allowedMeals,
+      currentMeal.mealType,
+    );
+
+    const { isWrongLocation, assignedHallName } = await checkAssignedLocation(
+      employee.id,
+      targetMealType,
+      Number(diningHallId),
+    );
 
     await createMealLog({
       userId: employee.id,
       btegId: employee.employeeCode,
       idcardNumber: employee.idcardNumber,
       employeeName: employee.name,
-      mealType: currentMeal.mealType,
+      mealType: targetMealType,
       diningHallId: Number(diningHallId),
       date: today,
       scannedAt: new Date().toISOString(),
       syncStatus: "pending",
-      isExtraServing: true,
+      isExtraServing: true, // Нэмэлт порц
       isManualOverride: true,
       isWrongLocation: isWrongLocation,
       chefId: activeChefId ? Number(activeChefId) : null,
       deviceUuid: deviceUuid ?? null,
-      syncKey: `manual-${employee.id}-${currentMeal.id}-${today}-extra-${Date.now()}`,
+      syncKey: `manual-${employee.id}-${targetMealType}-${today}-extra-${Date.now()}`,
     });
 
     setDuplicate(null);

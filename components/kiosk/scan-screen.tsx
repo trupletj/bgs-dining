@@ -366,16 +366,55 @@ export function ScanScreen() {
     let employee = pendingModal.employee;
     let assignedLocationId = pendingModal.assignedLocationId;
 
+    // 1. Хэрэв employee байхгүй бол DB-ээс нөхөж хайх
     if (!employee && pendingModal.btegId) {
       employee = await db.employees
         .where("employeeCode")
         .equals(pendingModal.btegId)
         .first();
+    }
 
-      if (employee) {
+    // 2. Ажилтны ээлжинд тохирох mealType-ийг тодорхойлох (Mapping)
+    let targetMealType = currentMeal.mealType;
+    if (employee) {
+      const allowedMeals = getAllowedMealTypesForShift(
+        employee.shiftStart,
+        employee.shiftEnd,
+        new Date(),
+      );
+
+      if (!allowedMeals.includes(targetMealType)) {
+        if (
+          targetMealType === "lunch" &&
+          allowedMeals.includes("extend_lunch")
+        ) {
+          targetMealType = "extend_lunch";
+        } else if (
+          (targetMealType === "breakfast" ||
+            targetMealType === "morning_meal") &&
+          allowedMeals.includes("extend_morning_meal")
+        ) {
+          targetMealType = "extend_morning_meal";
+        } else if (
+          targetMealType === "breakfast" &&
+          allowedMeals.includes("morning_meal")
+        ) {
+          targetMealType = "morning_meal";
+        }
+      }
+
+      // 3. Байршлыг дахин шалгах
+      const override = await db.mealLocationOverrides
+        .where("[userId+date+mealType]")
+        .equals([employee.id, today, targetMealType])
+        .first();
+
+      if (override) {
+        assignedLocationId = override.diningHallId;
+      } else {
         const config = await db.userMealConfigs.get(employee.id);
         const location = config
-          ? getMealLocationForSlot(config, currentMeal.mealType)
+          ? getMealLocationForSlot(config, targetMealType)
           : null;
         if (location !== "skip" && location !== null) {
           assignedLocationId = Number(location);
@@ -387,18 +426,19 @@ export function ScanScreen() {
       assignedLocationId !== null &&
       assignedLocationId !== Number(diningHallId);
 
+    // 4. Log үүсгэх (employee олдсон бол userId-г заавал дамжуулна)
     if (employee) {
-      // Системд байгаа ажилтан
       await doCreateLog({
         employee,
         isExtraServing: false,
-        mealType: currentMeal.mealType,
+        mealType: targetMealType, // Хөрвүүлсэн төрлөөр нь
         isManualOverride: true,
-        isWrongLocation, // Одоо энд зөв утга орно (true/false)
+        isWrongLocation,
       });
     } else {
+      // DB-д огт байхгүй ажилтан бол хуучин хэвээрээ
       await createMealLog({
-        userId: "",
+        userId: "", // Олдоогүй
         btegId: pendingModal.btegId || "",
         idcardNumber: pendingModal.scannedCode,
         employeeName: "Тодорхойгүй ажилтан",
@@ -409,7 +449,7 @@ export function ScanScreen() {
         syncStatus: "pending",
         isExtraServing: false,
         isManualOverride: true,
-        isWrongLocation: isWrongLocation, // Мэдээлэл байхгүй бол false байна
+        isWrongLocation: isWrongLocation,
         chefId: activeChefId ? Number(activeChefId) : null,
         deviceUuid: deviceUuid ?? null,
         syncKey: `manual-${pendingModal.scannedCode}-${today}-${Date.now()}`,
@@ -424,7 +464,7 @@ export function ScanScreen() {
         ? "Буруу байршилд бүртгэгдлээ"
         : "Бүртгэл хадгалагдлаа",
       employeeName: employee?.name ?? "Бүртгэлгүй ажилтан",
-      mealName: getMealName(currentMeal.mealType),
+      mealName: getMealName(targetMealType),
     });
     setScanState("result");
   }, [

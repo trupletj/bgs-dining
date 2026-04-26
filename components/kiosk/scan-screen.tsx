@@ -49,8 +49,12 @@ export function ScanScreen() {
   const [confirmationResult, setConfirmationResult] =
     useState<ConfirmationResult | null>(null);
   const [pendingModal, setPendingModal] = useState<PendingModal | null>(null);
+
   const { activeMeals } = useCurrentMeal();
   const lastScannedRef = useRef<{ code: string; time: number } | null>(null);
+
+  // 1. scanState-г давхар хянах ref нэмэх
+  const scanStateRef = useRef<ScanState>("idle");
 
   const currentMeal = activeMeals.length > 0 ? activeMeals[0] : null;
 
@@ -63,6 +67,12 @@ export function ScanScreen() {
   const { value: deviceUuid } = useKioskConfig(KIOSK_CONFIG_KEYS.DEVICE_UUID);
   const { play: playSound } = useScanSound();
   const { syncEmployees, state: syncState } = useSync();
+
+  // 2. setScanState-г орлох функц (State болон Ref хоёуланг нь шинэчилнэ)
+  const setScanStateWithRef = useCallback((newState: ScanState) => {
+    scanStateRef.current = newState;
+    setScanState(newState);
+  }, []);
 
   const generateSyncKey = (
     userId: string,
@@ -115,7 +125,8 @@ export function ScanScreen() {
     async (code: string) => {
       const now = Date.now();
 
-      if (scanState === "processing") return;
+      // 3. State биш Ref ашиглаж шалгах
+      if (scanStateRef.current === "processing") return;
 
       // 3 секундын доторх давхар скан хаах
       if (
@@ -126,7 +137,9 @@ export function ScanScreen() {
         return;
       }
       lastScannedRef.current = { code, time: now };
-      setScanState("processing");
+
+      // 4. Бүх setScanState-ийг setScanStateWithRef-ээр солих
+      setScanStateWithRef("processing");
 
       setPendingModal(null);
       setConfirmationResult(null);
@@ -137,7 +150,7 @@ export function ScanScreen() {
           title: "Хоолны цаг биш",
           message: "Одоогоор хоолны цаг эхлээгүй байна",
         });
-        setScanState("result");
+        setScanStateWithRef("result");
         return;
       }
 
@@ -153,7 +166,7 @@ export function ScanScreen() {
             title: "Буруу QR код",
             message: "Системд бүртгэлгүй эсвэл буруу форматтай код байна",
           });
-          setScanState("result");
+          setScanStateWithRef("result");
           return;
         }
 
@@ -169,7 +182,7 @@ export function ScanScreen() {
             title: "Буруу QR код",
             message: "QR кодын формат таарахгүй байна",
           });
-          setScanState("result");
+          setScanStateWithRef("result");
           return;
         }
 
@@ -199,7 +212,7 @@ export function ScanScreen() {
           if (existingUnregistered) {
             setPendingModal({
               type: "double-scan",
-              employee: { name: "Бүртгэлгүй ажилтан", id: "" } as Employee, // Dummy объект
+              employee: { name: "Бүртгэлгүй ажилтан", id: "" } as Employee,
               btegId: lookupBteg || "",
               scannedCode: lookupIdCard || code,
               assignedLocationId: null,
@@ -207,7 +220,7 @@ export function ScanScreen() {
               message: "Энэ бүртгэлгүй ажилтан аль хэдийн бүртгүүлсэн байна",
               existingLog: existingUnregistered,
             });
-            setScanState("idle");
+            setScanStateWithRef("idle");
             return;
           }
 
@@ -215,10 +228,10 @@ export function ScanScreen() {
             type: "unauthorized",
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
-            assignedLocationId: null, // Мэдээлэл байхгүй үед null дамжуулна
+            assignedLocationId: null,
             message: "Бүртгэлгүй ажилтан",
           });
-          setScanState("idle");
+          setScanStateWithRef("idle");
           return;
         }
 
@@ -231,7 +244,7 @@ export function ScanScreen() {
             message: `${employee.name} идэвхгүй байна`,
             employeeName: employee.name,
           });
-          setScanState("result");
+          setScanStateWithRef("result");
           return;
         }
 
@@ -243,7 +256,6 @@ export function ScanScreen() {
         );
         let targetMealType = currentMeal.mealType;
 
-        // Хоолны төрөл хөрвүүлэх (Extend Lunch, Morning Meal гэх мэт)
         if (!allowedMeals.includes(targetMealType)) {
           if (
             targetMealType === "lunch" &&
@@ -273,7 +285,7 @@ export function ScanScreen() {
             assignedLocationId: null,
             message: `${employee.name} энэ хоолыг (${MEAL_NAME_MAP[targetMealType] || targetMealType}) идэх хуваарьгүй байна.`,
           });
-          setScanState("idle");
+          setScanStateWithRef("idle");
           return;
         }
 
@@ -310,12 +322,12 @@ export function ScanScreen() {
           setPendingModal({
             type: "unauthorized",
             employee,
-            assignedLocationId, // Зөв байршлыг дамжуулж байна
+            assignedLocationId,
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
             message: `${employee.name} нь "${targetHallName}"-д хуваарьтай байна. Энд гараар зөвшөөрөх үү?`,
           });
-          setScanState("idle");
+          setScanStateWithRef("idle");
           return;
         } else if (assignedLocationId === null) {
           setPendingModal({
@@ -326,7 +338,7 @@ export function ScanScreen() {
             scannedCode: lookupIdCard || code,
             message: `${employee.name} энэ хоолонд бүртгэлгүй байна.`,
           });
-          setScanState("idle");
+          setScanStateWithRef("idle");
           return;
         }
 
@@ -347,7 +359,7 @@ export function ScanScreen() {
             message: `${employee.name} аль хэдийн бүртгүүлсэн`,
             existingLog: existing,
           });
-          setScanState("idle");
+          setScanStateWithRef("idle");
           return;
         }
 
@@ -366,19 +378,20 @@ export function ScanScreen() {
           employeeName: employee.name,
           mealName: getMealName(targetMealType),
         });
-        setScanState("result");
+        setScanStateWithRef("result");
       } catch (error) {
         console.error("Scan error:", error);
-        setScanState("result");
+        setScanStateWithRef("result");
       }
     },
-    [scanState, currentMeal, diningHallId, doCreateLog, playSound],
+    // 5. Dependency-ээс scanState хасагдаж, setScanStateWithRef нэмэгдсэн
+    [currentMeal, diningHallId, doCreateLog, playSound, setScanStateWithRef],
   );
 
   const handleDismiss = useCallback(() => {
-    setScanState("idle");
+    setScanStateWithRef("idle");
     setConfirmationResult(null);
-  }, []);
+  }, [setScanStateWithRef]);
 
   const handleApproveManually = useCallback(async () => {
     if (!pendingModal || !currentMeal || !diningHallId) return;
@@ -387,7 +400,6 @@ export function ScanScreen() {
     let employee = pendingModal.employee;
     let assignedLocationId = pendingModal.assignedLocationId;
 
-    // 1. Хэрэв employee байхгүй бол DB-ээс нөхөж хайх
     if (!employee && pendingModal.btegId) {
       employee = await db.employees
         .where("employeeCode")
@@ -395,7 +407,6 @@ export function ScanScreen() {
         .first();
     }
 
-    // 2. Ажилтны ээлжинд тохирох mealType-ийг тодорхойлох (Mapping)
     let targetMealType = currentMeal.mealType;
     if (employee) {
       const allowedMeals = getAllowedMealTypesForShift(
@@ -424,7 +435,6 @@ export function ScanScreen() {
         }
       }
 
-      // 3. Байршлыг дахин шалгах
       const override = await db.mealLocationOverrides
         .where("[userId+date+mealType]")
         .equals([employee.id, today, targetMealType])
@@ -447,19 +457,17 @@ export function ScanScreen() {
       assignedLocationId !== null &&
       assignedLocationId !== Number(diningHallId);
 
-    // 4. Log үүсгэх (employee олдсон бол userId-г заавал дамжуулна)
     if (employee) {
       await doCreateLog({
         employee,
         isExtraServing: false,
-        mealType: targetMealType, // Хөрвүүлсэн төрлөөр нь
+        mealType: targetMealType,
         isManualOverride: true,
         isWrongLocation,
       });
     } else {
-      // DB-д огт байхгүй ажилтан бол хуучин хэвээрээ
       await createMealLog({
-        userId: "", // Олдоогүй
+        userId: "",
         btegId: pendingModal.btegId || "",
         idcardNumber: pendingModal.scannedCode,
         employeeName: "Тодорхойгүй ажилтан",
@@ -487,7 +495,7 @@ export function ScanScreen() {
       employeeName: employee?.name ?? "Бүртгэлгүй ажилтан",
       mealName: getMealName(targetMealType),
     });
-    setScanState("result");
+    setScanStateWithRef("result");
   }, [
     pendingModal,
     currentMeal,
@@ -495,6 +503,7 @@ export function ScanScreen() {
     activeChefId,
     deviceUuid,
     doCreateLog,
+    setScanStateWithRef,
   ]);
 
   const handleAddExtraServing = useCallback(async () => {
@@ -517,12 +526,13 @@ export function ScanScreen() {
       employeeName: pendingModal.employee.name,
       mealName: getMealName(correctMealType),
     });
-    setScanState("result");
-  }, [pendingModal, currentMeal, doCreateLog]);
+    setScanStateWithRef("result");
+  }, [pendingModal, currentMeal, doCreateLog, setScanStateWithRef]);
 
+  // 6. Camera үргэлж идэвхтэй байх, гэхдээ үйлдэл нь Ref-ээр хязгаарлагдана
   useBarcodeScanner({
     onScan: handleScan,
-    enabled: scanState !== "processing",
+    enabled: true,
   });
 
   return (
@@ -530,7 +540,7 @@ export function ScanScreen() {
       {/* Header — хоёуланд нийтлэг */}
       <div className="shrink-0 z-10">
         <StatusBar />
-        <div className="flex items-center justify-between border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-white/5 bg-slate-900/40 px-4 py-2.5">
           <CurrentMealDisplay />
           <div className="flex items-center gap-2">
             <button
@@ -554,7 +564,7 @@ export function ScanScreen() {
           {/* <CameraScanner onScan={handleScan} /> */}
         </div>
         <div
-          className={`relative border-l border-white/5 bg-slate-900/40 backdrop-blur-2xl transition-all duration-500 ease-in-out ${activeMeals.length === 2 ? "flex-[2] w-[600px]" : "flex-[0.8] w-80"}`}>
+          className={`relative border-l border-white/5 bg-slate-900/40 transition-all duration-500 ease-in-out ${activeMeals.length === 2 ? "flex-[2] w-[600px]" : "flex-[0.8] w-80"}`}>
           {activeMeals.length === 2 ? (
             <div className="flex h-full w-full">
               <div className="flex flex-1 flex-col border-r border-white/5 bg-slate-900/20">

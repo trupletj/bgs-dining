@@ -1,5 +1,3 @@
-import { Employee } from "./db";
-
 export const APP_NAME = "Canteen Kiosk";
 export const DB_NAME = "canteen-kiosk-db";
 export const DB_VERSION = 3;

@@ -22,8 +22,8 @@ export function ConfirmedListSidebar() {
   });
 
   return (
-    <div className="flex flex-1 flex-col bg-slate-900/20 backdrop-blur-xl min-h-0">
-      <div className="flex items-center gap-2 border-b border-white/5 bg-slate-900/60 backdrop-blur-xl px-4 py-3">
+    <div className="flex flex-1 flex-col bg-slate-900/20 min-h-0">
+      <div className="flex items-center gap-2 border-b border-white/5 bg-slate-900/60 px-4 py-3">
         <div className="flex items-center justify-center rounded-lg bg-blue-500/15 border border-blue-400/20 p-1">
           <Users className="h-3.5 w-3.5 shrink-0 text-blue-400" />
         </div>
@@ -44,17 +44,7 @@ export function ConfirmedListSidebar() {
             {logs.map((log, index) => (
               <li
                 key={log.id}
-                className="group relative flex items-start gap-3 overflow-hidden rounded-xl bg-slate-800/40 backdrop-blur-sm border border-white/5 px-3 py-2.5 transition-all hover:bg-slate-800/60 hover:border-white/10 hover:shadow-[0_0_20px_-5px_rgba(59,130,246,0.1)] animate-in slide-in-from-right-5 fade-in-0 duration-300"
-                style={{
-                  animationDelay: `${Math.min(index * 50, 500)}ms`,
-                  animationFillMode: "backwards",
-                }}>
-                {/* Shimmer effect on newest item */}
-                {index === 0 && (
-                  <div className="pointer-events-none absolute inset-0 overflow-hidden">
-                    <div className="animate-shimmer-once absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-                  </div>
-                )}
+                className="group relative flex items-start gap-3 overflow-hidden rounded-xl bg-slate-800/40 border border-white/5 px-3 py-2.5 transition-all hover:bg-slate-800/60 hover:border-white/10  fade-in-0 duration-300">
                 <div className="mt-0.5 flex items-center justify-center rounded-md bg-emerald-500/15 border border-emerald-400/20 p-1">
                   <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-400" />
                 </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   runFullSync,
   pullEmployees,
@@ -16,151 +16,104 @@ export function useSync() {
   const [state, setState] = useState<SyncState>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
 
-  // const sync = useCallback(async () => {
-  //   if (state === "syncing") return;
-  //   setState("syncing");
-  //   setLastError(null);
+  // Синк хийгдэж байгаа эсэхийг хугацааны хоцрогдолгүй (synchronous) хянах
+  const isSyncingRef = useRef(false);
 
-  //   try {
-  //     const results = await runFullSync();
-  //     setState("success");
-  //     setTimeout(() => setState("idle"), 3000);
-  //     return results;
-  //   } catch (error) {
-  //     const msg = error instanceof Error ? error.message : "Sync failed";
-  //     setLastError(msg);
-  //     setState("error");
-  //     setTimeout(() => setState("idle"), 5000);
-  //   }
-  // }, [state]);
-
-  const sync = useCallback(async () => {
+  /**
+   * Нийтлэг синк хийх загвар (Wrapper function)
+   * Энэ нь бүх синк функцүүдэд ижил "хаалт" болон "төлөв" хянах боломжийг олгоно.
+   */
+  const executeSync = useCallback(async (syncFn: () => Promise<any>) => {
     if (typeof window !== "undefined" && !navigator.onLine) {
-      console.log("Offline mode: Using local cached data.");
+      console.log("Оффлайн горим: Дотоод датаг ашиглаж байна.");
       return;
     }
-    if (window.location.pathname === "/setup") return;
-    let isAlreadySyncing = false;
-    setState((prev) => {
-      if (prev === "syncing") {
-        isAlreadySyncing = true;
-        return prev;
-      }
-      return "syncing";
-    });
 
-    if (isAlreadySyncing) return;
+    if (isSyncingRef.current) {
+      console.warn("Синк аль хэдийн явж байна, алгаслаа.");
+      return;
+    }
 
+    isSyncingRef.current = true;
+    setState("syncing");
     setLastError(null);
 
     try {
-      const results = await runFullSync();
-      if (results.isOffline) {
-        setState("idle"); // Амжилттай гэж харуулах хэрэггүй
-        return;
-      } else {
-        setState("success");
-        setTimeout(() => setState("idle"), 3000);
-      }
-      return results;
+      const result = await syncFn();
+      setState("success");
+
+      // Амжилттай болсон төлөвийг 3 секундын дараа арилгах
+      setTimeout(() => setState("idle"), 3000);
+      return result;
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Sync failed";
-      console.error("Sync error:", msg);
+      const msg =
+        error instanceof Error ? error.message : "Синк амжилтгүй боллоо";
+      console.error("Синк алдаа:", msg);
       setLastError(msg);
       setState("error");
-      setTimeout(() => setState("idle"), 5000);
-    }
-  }, []); // [] Хоосон dependency - функц дахин үүсэхгүй
 
+      // Алдааны төлөвийг 5 секундын дараа арилгах
+      setTimeout(() => setState("idle"), 5000);
+      if (syncFn !== runFullSync) throw error; // Ганцаарчилсан синк бол алдааг дамжуулна
+    } finally {
+      isSyncingRef.current = false;
+    }
+  }, []);
+
+  // 1. Бүх датаг бүтнээр синк хийх
+  const sync = useCallback(async () => {
+    if (window.location.pathname === "/setup") return;
+    return await executeSync(runFullSync);
+  }, [executeSync]);
+
+  // 2. Ажилчдын мэдээлэл татах
   const syncEmployees = useCallback(async () => {
-    setState("syncing");
-    try {
+    return await executeSync(async () => {
       const count = await pullEmployees();
       await pullMealLocationOverrides();
-      setState("success");
-      setTimeout(() => setState("idle"), 3000);
       return count;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Sync failed";
-      setLastError(msg);
-      setState("error");
-      setTimeout(() => setState("idle"), 5000);
-      throw error;
-    }
-  }, []);
+    });
+  }, [executeSync]);
 
+  // 3. Хоолны танхимын мэдээлэл татах
   const syncDiningHalls = useCallback(async () => {
-    setState("syncing");
-    try {
-      const count = await pullDiningHalls();
-      setState("success");
-      setTimeout(() => setState("idle"), 3000);
-      return count;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Sync failed";
-      setLastError(msg);
-      setState("error");
-      setTimeout(() => setState("idle"), 5000);
-      throw error;
-    }
-  }, []);
+    return await executeSync(pullDiningHalls);
+  }, [executeSync]);
 
+  // 4. Ахлах тогооч нарын мэдээлэл татах
   const syncChefs = useCallback(async () => {
-    setState("syncing");
-    try {
-      const count = await pullChefs();
-      setState("success");
-      setTimeout(() => setState("idle"), 3000);
-      return count;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Sync failed";
-      setLastError(msg);
-      setState("error");
-      setTimeout(() => setState("idle"), 5000);
-      throw error;
-    }
-  }, []);
+    return await executeSync(pullChefs);
+  }, [executeSync]);
 
+  // 5. Байршлын тохиргоо татах
   const syncOverrides = useCallback(async () => {
-    setState("syncing");
-    try {
-      const count = await pullMealLocationOverrides();
-      setState("success");
-      setTimeout(() => setState("idle"), 3000);
-      return count;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Sync failed";
-      setLastError(msg);
-      setState("error");
-      setTimeout(() => setState("idle"), 5000);
-      throw error;
-    }
-  }, []);
+    return await executeSync(pullMealLocationOverrides);
+  }, [executeSync]);
 
+  // 6. Лог мэдээллийг сервер рүү илгээх
   const syncMealLogs = useCallback(async () => {
-    setState("syncing");
-    try {
-      const count = await pushMealLogs();
-      setState("success");
-      setTimeout(() => setState("idle"), 3000);
-      return count;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Sync failed";
-      setLastError(msg);
-      setState("error");
-      setTimeout(() => setState("idle"), 5000);
-      throw error;
-    }
-  }, []);
+    return await executeSync(pushMealLogs);
+  }, [executeSync]);
 
+  /**
+   * Автомат синк хийх useEffect
+   */
   useEffect(() => {
-    sync();
+    // Программ асах үед шууд биш, 2 секундын дараа эхний синк-ийг хийнэ (UI-д ачаалал өгөхгүй)
+    const initialTimer = setTimeout(() => {
+      sync();
+    }, 2000);
+
+    // 10 минут тутамд автомат синк (600,000 ms)
     const interval = setInterval(() => {
       console.log("Автомат шинэчлэл эхэлж байна...");
       sync();
-    }, 600000);
+    }, 1200000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
   }, [sync]);
 
   return {

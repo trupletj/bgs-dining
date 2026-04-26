@@ -526,111 +526,101 @@ export function ScanScreen() {
   });
 
   return (
-    <div className="flex h-screen flex-col select-none bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <div className="relative z-10 flex h-screen flex-col">
+    <div className="flex h-dvh flex-col select-none bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      {/* Header — хоёуланд нийтлэг */}
+      <div className="shrink-0 z-10">
         <StatusBar />
-        <div className="flex items-center justify-between border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-6 py-2.5">
+        <div className="flex items-center justify-between border-b border-white/5 bg-slate-900/40 backdrop-blur-xl px-4 py-2.5">
           <CurrentMealDisplay />
           <div className="flex items-center gap-2">
             <button
               onClick={() => syncEmployees()}
               disabled={syncState === "syncing"}
-              className="flex items-center gap-2 rounded-xl bg-slate-800/60 border border-white/10 px-4 py-2 text-sm text-slate-300 hover:text-white">
+              className="flex items-center gap-2 rounded-xl bg-slate-800/60 border border-white/10 px-3 py-2 text-sm text-slate-300 hover:text-white">
               <RefreshCw
                 className={`h-4 w-4 ${syncState === "syncing" ? "animate-spin" : ""}`}
               />
-              Шинэчлэх
+              <span className="hidden sm:inline">Шинэчлэх</span>
             </button>
             <ManualEntry />
           </div>
         </div>
+      </div>
 
-        <div className="flex flex-1 overflow-hidden bg-slate-950">
-          {/* Зүүн тал: Сканнер */}
-          <div className="relative flex flex-[2] flex-col items-center justify-center gap-6">
+      {/* Desktop layout */}
+      <div className="hidden md:flex flex-1 min-h-0 overflow-hidden bg-slate-950">
+        <div className="relative flex flex-[2] flex-col items-center justify-center gap-6">
+          <IdleScreen />
+          <CameraScanner onScan={handleScan} />
+        </div>
+        <div
+          className={`relative border-l border-white/5 bg-slate-900/40 backdrop-blur-2xl transition-all duration-500 ease-in-out ${activeMeals.length === 2 ? "flex-[2] w-[600px]" : "flex-[0.8] w-80"}`}>
+          {activeMeals.length === 2 ? (
+            <div className="flex h-full w-full">
+              <div className="flex flex-1 flex-col border-r border-white/5 bg-slate-900/20">
+                <div className="p-3 border-b border-white/5 bg-slate-900/40">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70">
+                    Гал тогоо (Давхар ээлж)
+                  </h3>
+                </div>
+                <ScrollArea className="flex-1">
+                  <div className="flex flex-col">
+                    {activeMeals.map((meal) => (
+                      <ChefDashboard key={meal.id} mealSlot={meal} />
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+              <div className="flex flex-1 flex-col">
+                <ConfirmedListSidebar />
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-full flex-col">
+              <div className="border-b border-white/5 bg-slate-900/40">
+                {activeMeals.length > 0 ? (
+                  activeMeals.map((meal) => (
+                    <ChefDashboard key={meal.id} mealSlot={meal} />
+                  ))
+                ) : (
+                  <div className="p-6 text-center text-slate-500 text-sm italic">
+                    Хоолны цаг эхлээгүй
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-h-0">
+                <ConfirmedListSidebar />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile layout — scroll хийгдэнэ */}
+      <div className="flex md:hidden flex-1 min-h-0 overflow-y-auto bg-slate-950">
+        <div className="flex flex-col w-full">
+          <div className="flex flex-col items-center gap-4 p-4">
             <IdleScreen />
             <CameraScanner onScan={handleScan} />
           </div>
-
-          <div
-            className={`
-  relative border-l border-white/5 bg-slate-900/40 backdrop-blur-2xl transition-all duration-500 ease-in-out
-  ${activeMeals.length === 2 ? "flex-[2] w-[600px]" : "flex-[0.8] w-80"}
-`}>
-            {activeMeals.length === 2 ? (
-              <div className="flex h-full w-full">
-                <div className="flex flex-1 flex-col border-r border-white/5 bg-slate-900/20">
-                  <div className="p-3 border-b border-white/5 bg-slate-900/40">
-                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70">
-                      Гал тогоо (Давхар ээлж)
-                    </h3>
-                  </div>
-                  <ScrollArea className="flex-1">
-                    <div className="flex flex-col">
-                      {activeMeals.map((meal) => (
-                        <ChefDashboard key={meal.id} mealSlot={meal} />
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
-
-                <div className="flex flex-1 flex-col">
-                  <ConfirmedListSidebar />
-                </div>
-              </div>
-            ) : (
-              <div className="flex h-full flex-col">
-                <div className="border-b border-white/5 bg-slate-900/40">
-                  {activeMeals.length > 0 ? (
-                    activeMeals.map((meal) => (
-                      <ChefDashboard key={meal.id} mealSlot={meal} />
-                    ))
-                  ) : (
-                    <div className="p-6 text-center text-slate-500 text-sm italic">
-                      Хоолны цаг эхлээгүй
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 min-h-0">
-                  <ConfirmedListSidebar />
-                </div>
-              </div>
-            )}
+          <div className="border-t border-white/5">
+            {activeMeals.map((meal) => (
+              <ChefDashboard key={meal.id} mealSlot={meal} />
+            ))}
           </div>
-        </div>
-
-        <div className="flex md:hidden flex-1 min-h-0 overflow-y-auto bg-slate-950">
-          {/*                                   ↑ overflow-y-auto */}
-          <div className="flex flex-col min-h-full">
-            {/* Камер хэсэг */}
-            <div className="flex flex-col items-center justify-center gap-4 p-6">
-              <IdleScreen />
-              <CameraScanner onScan={handleScan} />
-            </div>
-
-            {/* Chef dashboard */}
-            <div className="border-t border-white/5">
-              {activeMeals.map((meal) => (
-                <ChefDashboard key={meal.id} mealSlot={meal} />
-              ))}
-            </div>
-
-            {/* Бүртгэлийн жагсаалт */}
-            <div className="flex-1">
-              <ConfirmedListSidebar />
-            </div>
+          <div className="flex-1">
+            <ConfirmedListSidebar />
           </div>
         </div>
       </div>
 
+      {/* Modals */}
       {scanState === "result" && confirmationResult && (
         <MealConfirmationOverlay
           result={confirmationResult}
           onDismiss={handleDismiss}
         />
       )}
-
       {pendingModal?.type === "unauthorized" && (
         <ScanModal
           open={true}
@@ -641,7 +631,6 @@ export function ScanScreen() {
           message={pendingModal.message}
         />
       )}
-
       {pendingModal?.type === "double-scan" && pendingModal.employee && (
         <DoubleScanModal
           open={true}

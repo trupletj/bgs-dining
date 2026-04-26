@@ -551,7 +551,7 @@ export function ScanScreen() {
       <div className="hidden md:flex flex-1 min-h-0 overflow-hidden bg-slate-950">
         <div className="relative flex flex-[2] flex-col items-center justify-center gap-6">
           <IdleScreen />
-          <CameraScanner onScan={handleScan} />
+          {/* <CameraScanner onScan={handleScan} /> */}
         </div>
         <div
           className={`relative border-l border-white/5 bg-slate-900/40 backdrop-blur-2xl transition-all duration-500 ease-in-out ${activeMeals.length === 2 ? "flex-[2] w-[600px]" : "flex-[0.8] w-80"}`}>
@@ -601,7 +601,7 @@ export function ScanScreen() {
         <div className="flex flex-col w-full">
           <div className="flex flex-col items-center gap-4 p-4">
             <IdleScreen />
-            <CameraScanner onScan={handleScan} />
+            <CameraScanner onScan={handleScan} id="camera-scanner-mobile" />
           </div>
           <div className="border-t border-white/5">
             {activeMeals.map((meal) => (

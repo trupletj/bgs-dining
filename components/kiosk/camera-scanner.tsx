@@ -5,11 +5,16 @@ import { useCameraScanner } from "@/hooks/use-camera-scanner";
 
 interface CameraScannerProps {
   onScan: (code: string) => void;
+  id?: string;
 }
 
-export function CameraScanner({ onScan }: CameraScannerProps) {
+export function CameraScanner({
+  onScan,
+  id = "camera-scanner-viewport",
+}: CameraScannerProps) {
   const { elementId, isStarted, error, start, stop } = useCameraScanner({
     onScan,
+    elementId: id,
   });
 
   return (

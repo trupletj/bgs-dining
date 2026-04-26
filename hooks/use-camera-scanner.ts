@@ -6,18 +6,19 @@ import { Html5Qrcode } from "html5-qrcode";
 interface UseCameraScannerOptions {
   onScan: (code: string) => void;
   debounceMs?: number;
+  elementId?: string;
 }
 
 export function useCameraScanner({
   onScan,
   debounceMs = 2000,
+  elementId = "camera-scanner-viewport",
 }: UseCameraScannerOptions) {
   const [isStarted, setIsStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastCodeRef = useRef<string>("");
   const lastScanTimeRef = useRef<number>(0);
-  const elementId = "camera-scanner-viewport";
 
   const handleDecode = useCallback(
     (decodedText: string) => {

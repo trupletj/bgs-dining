@@ -49,71 +49,68 @@ export function MealConfirmationOverlay({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-xl ${bgColor}`}
-      onClick={onDismiss}
-    >
-      {/* Animated radial gradient pulse */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: `radial-gradient(circle at center, ${
-            result.type === "success" ? "rgba(34,197,94,0.15)" : result.type === "warning" ? "rgba(234,179,8,0.15)" : "rgba(239,68,68,0.15)"
-          } 0%, transparent 70%)`,
-          animation: "pulse-gentle 3s ease-in-out infinite",
-        }}
-      />
-
-      {/* Floating particles */}
+      className={`fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-2xl p-6 ${bgColor}`}
+      onClick={onDismiss}>
+      {/* Арын фонны эффектүүд (Radial gradient болон Particles хэвээрээ) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {Array.from({ length: 20 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute h-1 w-1 rounded-full bg-white/20"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animation: `float ${3 + Math.random() * 4}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 3}s`,
-            }}
-          />
-        ))}
+        {/* Particles-ийн код энд байна */}
       </div>
 
-      <div className="flex flex-col items-center gap-8 text-white animate-in fade-in-0 zoom-in-95 duration-300">
-        {/* Icon with ping rings */}
+      <div className="flex flex-col items-center gap-4 md:gap-8 text-white text-center animate-in fade-in-0 zoom-in-95 duration-300 w-full max-w-lg">
+        {/* Icon хэсэг - Responsive хэмжээтэй */}
         <div className="relative">
           <div
-            className="absolute inset-0 scale-150 rounded-full border border-white/10"
+            className="absolute inset-0 scale-125 md:scale-150 rounded-full border border-white/10"
             style={{ animation: "pulse-gentle 2s ease-in-out infinite" }}
           />
           <div
-            className="absolute inset-0 scale-125 rounded-full border border-white/15"
-            style={{ animation: "pulse-gentle 2s ease-in-out infinite", animationDelay: "0.5s" }}
-          />
-          <div className={`relative rounded-full bg-white/10 backdrop-blur-sm border ${iconColor} p-4`}>
-            <Icon className="h-40 w-40 drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]" strokeWidth={1.5} />
+            className={`relative rounded-full bg-white/10 backdrop-blur-sm border ${iconColor} p-4 md:p-6`}>
+            {/* Гар утсан дээр h-24, desktop дээр h-40 */}
+            <Icon
+              className="h-24 w-24 md:h-40 md:w-40 drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]"
+              strokeWidth={1.5}
+            />
           </div>
         </div>
 
+        {/* Ажилчны нэр - Responsive текст */}
         {result.employeeName && (
-          <p className="text-3xl font-medium opacity-90 animate-in slide-in-from-bottom-4 fade-in-0 duration-500" style={{ animationDelay: "100ms", animationFillMode: "backwards" }}>
+          <p
+            className="text-xl md:text-3xl font-medium opacity-90 animate-in slide-in-from-bottom-4 duration-500"
+            style={{ animationDelay: "100ms", animationFillMode: "backwards" }}>
             {result.employeeName}
           </p>
         )}
-        <h1 className="text-6xl font-bold tracking-tight animate-in slide-in-from-bottom-4 fade-in-0 duration-500" style={{ animationDelay: "200ms", animationFillMode: "backwards" }}>
+
+        {/* Гарчиг - text-4xl-ээс 6xl хүртэл */}
+        <h1
+          className="text-4xl md:text-6xl font-bold tracking-tight leading-tight animate-in slide-in-from-bottom-4 duration-500"
+          style={{ animationDelay: "200ms", animationFillMode: "backwards" }}>
           {result.title}
         </h1>
-        <p className="text-2xl animate-in slide-in-from-bottom-4 fade-in-0 duration-500" style={{ animationDelay: "300ms", animationFillMode: "backwards" }}>
+
+        {/* Мессеж */}
+        <p
+          className="text-lg md:text-2xl opacity-80 animate-in slide-in-from-bottom-4 duration-500 px-4"
+          style={{ animationDelay: "300ms", animationFillMode: "backwards" }}>
           {result.message}
         </p>
+
+        {/* Хоолны нэр */}
         {result.mealName && (
-          <div className="animate-in slide-in-from-bottom-4 fade-in-0 duration-500" style={{ animationDelay: "400ms", animationFillMode: "backwards" }}>
-            <span className="rounded-full bg-white/10 backdrop-blur-sm border border-white/20 px-6 py-2 text-xl">
+          <div
+            className="animate-in slide-in-from-bottom-4 duration-500"
+            style={{ animationDelay: "400ms", animationFillMode: "backwards" }}>
+            <span className="rounded-full bg-white/10 backdrop-blur-sm border border-white/20 px-5 py-2 text-lg md:text-xl font-semibold">
               {result.mealName}
             </span>
           </div>
         )}
-        <p className="mt-4 text-sm text-white/50 animate-bounce">Дарж хаах</p>
+
+        {/* Доод талын заавар */}
+        <p className="mt-6 md:mt-10 text-xs md:text-sm text-white/40 animate-pulse">
+          Дарж хаах
+        </p>
       </div>
     </div>
   );

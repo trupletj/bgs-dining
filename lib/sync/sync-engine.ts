@@ -45,12 +45,6 @@ export async function pullEmployees(): Promise<number> {
 
     let query = supabase.from("users_with_stats").select("*");
 
-    if (diningHallId) {
-      query = query.or(
-        `breakfast_location.eq.${diningHallId},lunch_location.eq.${diningHallId},dinner_location.eq.${diningHallId},night_meal_location.eq.${diningHallId},morning_meal_location.eq.${diningHallId},extend_morning_meal_location.eq.${diningHallId},extend_lunch_location.eq.${diningHallId}`,
-      );
-    }
-
     const { data: allData, error } = await query;
     if (error) throw error;
     if (!allData || allData.length === 0) {

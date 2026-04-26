@@ -30,7 +30,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { UserPlus, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { getMealLocationForSlot } from "@/lib/meal-type-map";
 
 interface DuplicateInfo {
   employee: Employee;

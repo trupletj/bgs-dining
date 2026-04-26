@@ -8,7 +8,10 @@ interface UseCameraScannerOptions {
   debounceMs?: number;
 }
 
-export function useCameraScanner({ onScan, debounceMs = 2000 }: UseCameraScannerOptions) {
+export function useCameraScanner({
+  onScan,
+  debounceMs = 2000,
+}: UseCameraScannerOptions) {
   const [isStarted, setIsStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -30,7 +33,7 @@ export function useCameraScanner({ onScan, debounceMs = 2000 }: UseCameraScanner
       lastScanTimeRef.current = now;
       onScan(decodedText);
     },
-    [onScan, debounceMs]
+    [onScan, debounceMs],
   );
 
   const start = useCallback(async () => {
@@ -41,19 +44,37 @@ export function useCameraScanner({ onScan, debounceMs = 2000 }: UseCameraScanner
       const scanner = new Html5Qrcode(elementId);
       scannerRef.current = scanner;
 
-      await scanner.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
-        handleDecode,
-        () => {} // ignore errors on each frame
-      );
+      const devices = await Html5Qrcode.getCameras();
 
-      setIsStarted(true);
+      if (devices && devices.length > 0) {
+        const backCamera = devices.find(
+          (device) =>
+            device.label.toLowerCase().includes("back") ||
+            device.label.toLowerCase().includes("rear") ||
+            device.label.toLowerCase().includes("environment"),
+        );
+
+        const cameraId = backCamera ? backCamera.id : devices[0].id;
+
+        await scanner.start(
+          cameraId,
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0, // Fold-ийн дэлгэцэнд тохиромжтой
+          },
+          handleDecode,
+          () => {},
+        );
+        setIsStarted(true);
+      } else {
+        throw new Error("Камер олдсонгүй");
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Камер нээхэд алдаа гарлаа");
+      console.error("Camera Error:", err);
+      setError(
+        err instanceof Error ? err.message : "Камер нээхэд алдаа гарлаа",
+      );
       scannerRef.current = null;
     }
   }, [handleDecode]);

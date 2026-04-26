@@ -14,11 +14,18 @@ export function CameraScanner({ onScan }: CameraScannerProps) {
 
   return (
     <div className="flex flex-col items-center gap-3 w-full">
-      {/* hidden биш — харагдахгүй үед h-0 overflow-hidden ашиглана */}
+      {/* Камерын container — үргэлж DOM-д байна, хэмжээ үргэлж тодорхой */}
       <div
         id={elementId}
-        className={`rounded-2xl overflow-hidden bg-slate-800/50 shadow-lg ring-2 ring-blue-500/20 transition-all duration-300 w-full max-w-xs
-          ${isStarted ? "h-64 opacity-100" : "h-0 opacity-0"}`}
+        style={{
+          width: "100%",
+          maxWidth: "320px",
+          height: isStarted ? "320px" : "0px",
+          overflow: "hidden",
+          borderRadius: "16px",
+          background: "rgba(30,41,59,0.5)",
+          transition: "height 0.3s ease",
+        }}
       />
 
       {error && (

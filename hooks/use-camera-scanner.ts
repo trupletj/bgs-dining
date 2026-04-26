@@ -41,15 +41,30 @@ export function useCameraScanner({
     if (scannerRef.current) return;
     setError(null);
 
+    // Элемент DOM-д байгаа эсэх, хэмжээ тодорхой эсэхийг шалгана
+    const el = document.getElementById(elementId);
+    if (!el) {
+      setError("Камерын container олдсонгүй");
+      return;
+    }
+
+    // Mobile-д layout paint дуусахыг хүлээнэ
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
     try {
       const scanner = new Html5Qrcode(elementId);
       scannerRef.current = scanner;
 
       await scanner.start(
-        { facingMode: "environment" }, // ← deviceId биш, facingMode ашиглана
+        { facingMode: "environment" },
         {
           fps: 10,
-          qrbox: { width: 250, height: 250 },
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            // Хэмжээг динамикаар тодорхойлно
+            const size = Math.min(viewfinderWidth, viewfinderHeight, 250);
+            return { width: size, height: size };
+          },
           aspectRatio: 1.0,
         },
         handleDecode,
@@ -58,11 +73,14 @@ export function useCameraScanner({
       setIsStarted(true);
     } catch (err) {
       console.error("Camera Error:", err);
-      // facingMode: "environment" амжилтгүй бол user camera туршина
+      // Fallback: user camera
       try {
         await scannerRef.current?.start(
           { facingMode: "user" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+          },
           handleDecode,
           () => {},
         );
@@ -76,7 +94,7 @@ export function useCameraScanner({
         scannerRef.current = null;
       }
     }
-  }, [handleDecode]);
+  }, [handleDecode, elementId]);
 
   const stop = useCallback(async () => {
     if (!scannerRef.current) return;

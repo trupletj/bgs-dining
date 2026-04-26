@@ -599,6 +599,29 @@ export function ScanScreen() {
             )}
           </div>
         </div>
+
+        <div className="flex md:hidden flex-1 min-h-0 overflow-y-auto bg-slate-950">
+          {/*                                   ↑ overflow-y-auto */}
+          <div className="flex flex-col min-h-full">
+            {/* Камер хэсэг */}
+            <div className="flex flex-col items-center justify-center gap-4 p-6">
+              <IdleScreen />
+              <CameraScanner onScan={handleScan} />
+            </div>
+
+            {/* Chef dashboard */}
+            <div className="border-t border-white/5">
+              {activeMeals.map((meal) => (
+                <ChefDashboard key={meal.id} mealSlot={meal} />
+              ))}
+            </div>
+
+            {/* Бүртгэлийн жагсаалт */}
+            <div className="flex-1">
+              <ConfirmedListSidebar />
+            </div>
+          </div>
+        </div>
       </div>
 
       {scanState === "result" && confirmationResult && (

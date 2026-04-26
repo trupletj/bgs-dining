@@ -36,6 +36,7 @@ export function useCameraScanner({
     [onScan, debounceMs],
   );
 
+  // use-camera-scanner.ts — start функцийг өөрчлөх
   const start = useCallback(async () => {
     if (scannerRef.current) return;
     setError(null);
@@ -44,38 +45,36 @@ export function useCameraScanner({
       const scanner = new Html5Qrcode(elementId);
       scannerRef.current = scanner;
 
-      const devices = await Html5Qrcode.getCameras();
-
-      if (devices && devices.length > 0) {
-        const backCamera = devices.find(
-          (device) =>
-            device.label.toLowerCase().includes("back") ||
-            device.label.toLowerCase().includes("rear") ||
-            device.label.toLowerCase().includes("environment"),
-        );
-
-        const cameraId = backCamera ? backCamera.id : devices[0].id;
-
-        await scanner.start(
-          cameraId,
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0, // Fold-ийн дэлгэцэнд тохиромжтой
-          },
+      await scanner.start(
+        { facingMode: "environment" }, // ← deviceId биш, facingMode ашиглана
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
+        handleDecode,
+        () => {},
+      );
+      setIsStarted(true);
+    } catch (err) {
+      console.error("Camera Error:", err);
+      // facingMode: "environment" амжилтгүй бол user camera туршина
+      try {
+        await scannerRef.current?.start(
+          { facingMode: "user" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
           handleDecode,
           () => {},
         );
         setIsStarted(true);
-      } else {
-        throw new Error("Камер олдсонгүй");
+      } catch (fallbackErr) {
+        setError(
+          fallbackErr instanceof Error
+            ? fallbackErr.message
+            : "Камер нээхэд алдаа гарлаа",
+        );
+        scannerRef.current = null;
       }
-    } catch (err) {
-      console.error("Camera Error:", err);
-      setError(
-        err instanceof Error ? err.message : "Камер нээхэд алдаа гарлаа",
-      );
-      scannerRef.current = null;
     }
   }, [handleDecode]);
 

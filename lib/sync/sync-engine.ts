@@ -393,7 +393,7 @@ export async function pushMealLogs(): Promise<number> {
         user_id: !log.userId || log.userId === "unknown" ? null : log.userId,
         bteg_id: log.btegId || "",
         dining_hall_id: log.diningHallId,
-        meal_type: log.mealType,
+        meal_type: log.mealType === "nightmeal" ? "night_meal" : log.mealType,
         scanned_at: log.scannedAt,
         date: log.date,
         chef_id: log.chefId,

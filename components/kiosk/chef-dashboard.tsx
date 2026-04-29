@@ -122,7 +122,7 @@ export function ChefDashboard({ mealSlot }: ChefDashboardProps) {
     }
 
     return validDefaultCount + validIncomingCount - validOutgoingCount;
-  }, [mealSlot?.id, diningHallId, today]); // 3. currentTime ХАСАВ
+  }, [mealSlot?.id, diningHallId, today]);
 
   const expectedCount = expected ?? 0;
   const servedCount = counts?.servedPlan ?? 0;

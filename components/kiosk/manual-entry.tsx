@@ -55,7 +55,6 @@ export const ManualEntry = React.memo(() => {
 
   const allEmployees = useLiveQuery(() => db.employees.toArray(), []);
   const allSubEmployees = useLiveQuery(() => db.subEmployees.toArray(), []);
-  console.log("All sub employees:", allSubEmployees);
 
   // Байгаа ажилчдын хайлт
   const filteredEmployees = useMemo(() => {

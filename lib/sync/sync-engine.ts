@@ -262,7 +262,6 @@ export async function pullMealLocationOverrides(): Promise<number> {
       if (mappedOverrides.length > 0) {
         // Зөвхөн идэвхтэй байгааг нь нэмнэ
         await db.mealLocationOverrides.bulkAdd(mappedOverrides);
-        console.log(`Synced ${mappedOverrides.length} active overrides.`);
       } else {
         console.log("No active overrides on server. Local storage cleared.");
       }
@@ -333,7 +332,6 @@ export async function pullMealTimeSlots(): Promise<number> {
 
     const { data: slots, error } = await query;
     if (error) throw new Error(`meal_time_slots: ${error.message}`);
-    console.log("Fetched meal time slots:", slots);
 
     const mapped = (slots || []).map((s: Record<string, unknown>) => ({
       id: s.id as number,

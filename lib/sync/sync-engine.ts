@@ -38,7 +38,6 @@ async function getDiningHallId(): Promise<number | null> {
 export async function pullEmployees(): Promise<number> {
   if (!navigator.onLine) return 0;
   const logId = await logSync("pull-employees", "started", 0);
-  const diningHallId = await getDiningHallId();
 
   try {
     const supabase = await getSupabaseClient();
@@ -372,6 +371,55 @@ export async function pullMealTimeSlots(): Promise<number> {
   }
 }
 
+export async function pullSubEmployees(): Promise<number> {
+  if (!navigator.onLine) return 0;
+  const logId = await logSync("pull-employees", "started", 0);
+
+  try {
+    const supabase = await getSupabaseClient();
+
+    const { data, error } = await supabase
+      .from("sub_employee_for_food")
+      .select("id, org_id, custom_label, bteg_id, is_active")
+      .eq("is_active", true);
+
+    if (error) throw error;
+    if (!data || data.length === 0) return 0;
+
+    const mapped = data.map((row) => ({
+      id: row.id as string,
+      orgId: row.org_id as string,
+      customLabel: row.custom_label ?? "",
+      btegId: row.bteg_id ?? null,
+      isActive: row.is_active ?? true,
+    }));
+
+    await db.transaction("rw", db.subEmployees, async () => {
+      await db.subEmployees.clear();
+      await db.subEmployees.bulkAdd(mapped);
+    });
+
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "success",
+        recordCount: mapped.length,
+        completedAt: new Date().toISOString(),
+      });
+    }
+
+    return mapped.length;
+  } catch (error) {
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "failed",
+        completedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    throw error;
+  }
+}
+
 export async function pushMealLogs(): Promise<number> {
   const pending = await db.mealLogs
     .where("syncStatus")
@@ -402,6 +450,7 @@ export async function pushMealLogs(): Promise<number> {
         is_wrong_location: log.isWrongLocation,
         device_uuid: log.deviceUuid,
         sync_key: log.syncKey,
+        sub_employee_id: log.subEmployeeId,
       }));
 
       const { error } = await supabase
@@ -541,6 +590,11 @@ export async function runFullSync(): Promise<SyncResults> {
     results.employeesPulled = await pullEmployees();
   } catch (e) {
     console.error("Pull employees failed:", e);
+  }
+  try {
+    await pullSubEmployees();
+  } catch (e) {
+    console.error("Pull sub employees failed:", e);
   }
   try {
     results.overridesPulled = await pullMealLocationOverrides();

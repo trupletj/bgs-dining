@@ -1,6 +1,14 @@
 import Dexie, { type EntityTable } from "dexie";
 import { DB_NAME } from "@/lib/constants";
 
+export interface SubEmployee {
+  id: string;
+  orgId: string;
+  customLabel: string;
+  btegId: string | null;
+  isActive: boolean;
+}
+
 export interface Employee {
   id: string; // uuid from Supabase users.id
   employeeCode: string; // bteg_id
@@ -43,6 +51,7 @@ export interface MealLog {
   chefId: number | null;
   deviceUuid: string | null;
   syncKey: string; // unique key for upsert
+  subEmployeeId: string | null;
 }
 
 export interface MealTimeSlot {
@@ -105,6 +114,7 @@ export interface SyncLog {
 
 class CanteenDB extends Dexie {
   employees!: EntityTable<Employee, "id">;
+  subEmployees!: EntityTable<SubEmployee, "id">;
   userMealConfigs!: EntityTable<UserMealConfig, "userId">;
   mealLogs!: EntityTable<MealLog, "id">;
   mealTimeSlots!: EntityTable<MealTimeSlot, "id">;
@@ -203,6 +213,13 @@ class CanteenDB extends Dexie {
     this.version(8).stores({
       userMealConfigs:
         "userId, breakfastLocation, lunchLocation, dinnerLocation, nightMealLocation, morningMealLocation, extendMorningMealLocation, extendLunchLocation",
+    });
+    this.version(9).stores({
+      subEmployees: "id, orgId, btegId, isActive",
+    });
+    this.version(10).stores({
+      mealLogs:
+        "++id, [userId+mealType+date], idcardNumber, mealType, date, diningHallId, syncStatus, scannedAt, syncKey, subEmployeeId",
     });
   }
 }

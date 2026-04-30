@@ -74,32 +74,39 @@ export function ScanScreen() {
     setScanState(newState);
   }, []);
 
-  const generateSyncKey = (
-    userId: string,
-    mealType: string,
-    date: string,
-    extra: boolean,
-  ) => {
-    const base = `${userId}-${mealType}-${date}`;
-    return extra ? `${base}-extra-${Date.now()}` : base;
-  };
-
+  // 1. Параметрийн төрлийг шинэчлэх
   const doCreateLog = useCallback(
     async (params: {
-      employee: Employee;
+      employee?: Employee;
+      subEmployee?: { id: string; name: string; btegId?: string };
       isExtraServing: boolean;
       mealType: string;
       isManualOverride: boolean;
       isWrongLocation?: boolean;
     }) => {
       if (!diningHallId) return;
-
       const today = getLocalDate();
+
+      const userId = params.employee?.id || "";
+      const btegId =
+        params.employee?.employeeCode || params.subEmployee?.btegId || "";
+      const idcardNumber = params.employee?.idcardNumber || "";
+      const employeeName =
+        params.employee?.name || params.subEmployee?.name || "Тодорхойгүй";
+      const subEmployeeId = params.subEmployee?.id || null;
+
+      const baseKey = subEmployeeId
+        ? `sub-${subEmployeeId}-${params.mealType}-${today}`
+        : `${userId}-${params.mealType}-${today}`;
+      const syncKey = params.isExtraServing
+        ? `${baseKey}-extra-${Date.now()}`
+        : baseKey;
+
       await createMealLog({
-        userId: params.employee.id,
-        btegId: params.employee.employeeCode,
-        idcardNumber: params.employee.idcardNumber,
-        employeeName: params.employee.name,
+        userId,
+        btegId,
+        idcardNumber,
+        employeeName,
         mealType: params.mealType,
         diningHallId: Number(diningHallId),
         date: today,
@@ -110,12 +117,8 @@ export function ScanScreen() {
         isWrongLocation: params.isWrongLocation || false,
         chefId: activeChefId ? Number(activeChefId) : null,
         deviceUuid: deviceUuid ?? null,
-        syncKey: generateSyncKey(
-          params.employee.id,
-          params.mealType,
-          today,
-          params.isExtraServing,
-        ),
+        subEmployeeId,
+        syncKey,
       });
     },
     [diningHallId, activeChefId, deviceUuid],
@@ -125,10 +128,8 @@ export function ScanScreen() {
     async (code: string) => {
       const now = Date.now();
 
-      // 3. State биш Ref ашиглаж шалгах
       if (scanStateRef.current === "processing") return;
 
-      // 3 секундын доторх давхар скан хаах
       if (
         lastScannedRef.current &&
         lastScannedRef.current.code === code &&
@@ -138,7 +139,6 @@ export function ScanScreen() {
       }
       lastScannedRef.current = { code, time: now };
 
-      // 4. Бүх setScanState-ийг setScanStateWithRef-ээр солих
       setScanStateWithRef("processing");
 
       setPendingModal(null);
@@ -167,6 +167,13 @@ export function ScanScreen() {
             message: "Системд бүртгэлгүй эсвэл буруу форматтай код байна",
           });
           setScanStateWithRef("result");
+          return;
+        }
+
+        const subId = qrData?.sub_id ? String(qrData.sub_id) : null;
+
+        if (subId) {
+          await handleSubEmployeeScan(subId, qrData?.bteg_id ?? null);
           return;
         }
 
@@ -388,6 +395,101 @@ export function ScanScreen() {
     [currentMeal, diningHallId, doCreateLog, playSound, setScanStateWithRef],
   );
 
+  const handleSubEmployeeScan = useCallback(
+    async (subId: string, btegId: string | null) => {
+      if (!currentMeal || !diningHallId) {
+        setConfirmationResult({
+          type: "warning",
+          title: "Хоолны цаг биш",
+          message: "Одоогоор хоолны цаг эхлээгүй байна",
+        });
+        setScanStateWithRef("result");
+        return;
+      }
+
+      // 1. SubEmployee DB-ээс хайх
+      const subEmployee = await db.subEmployees.get(subId);
+
+      if (!subEmployee || !subEmployee.isActive) {
+        playSound("error");
+        setConfirmationResult({
+          type: "error",
+          title: "Бүртгэлгүй",
+          message: "Гэрээт ажилчны QR код танигдсангүй",
+        });
+        setScanStateWithRef("result");
+        return;
+      }
+
+      const today = getLocalDate();
+      const mealType = currentMeal.mealType;
+
+      // 2. Давхардал шалгах — subEmployeeId-аар
+      const existing = await db.mealLogs
+        .where("subEmployeeId")
+        .equals(subId)
+        .and((log) => log.mealType === mealType && log.date === today)
+        .first();
+
+      if (existing) {
+        // Давхар скан
+        setPendingModal({
+          type: "double-scan",
+          employee: {
+            name: subEmployee.customLabel,
+            id: "",
+            employeeCode: btegId ?? "",
+            idcardNumber: "",
+            phone: "",
+            department: "",
+            position: "",
+            heltesName: "",
+            isActive: true,
+            shiftStart: "",
+            shiftEnd: "",
+          },
+          scannedCode: subId,
+          btegId: btegId ?? "",
+          assignedLocationId: Number(diningHallId),
+          targetMealType: mealType,
+          message: `${subEmployee.customLabel} аль хэдийн бүртгүүлсэн`,
+          existingLog: existing,
+        });
+        setScanStateWithRef("idle");
+        return;
+      }
+
+      await doCreateLog({
+        subEmployee: {
+          id: subId,
+          name: subEmployee.customLabel,
+          btegId: btegId ?? undefined,
+        },
+        isExtraServing: false,
+        mealType,
+        isManualOverride: false,
+      });
+
+      playSound("success");
+      setConfirmationResult({
+        type: "success",
+        title: "Амжилттай",
+        message: "Гэрээт ажилчны бүртгэл хийгдлээ",
+        employeeName: subEmployee.customLabel,
+        mealName: getMealName(mealType),
+      });
+      setScanStateWithRef("result");
+    },
+    [
+      currentMeal,
+      diningHallId,
+      activeChefId,
+      deviceUuid,
+      playSound,
+      setScanStateWithRef,
+    ],
+  );
+
   const handleDismiss = useCallback(() => {
     setScanStateWithRef("idle");
     setConfirmationResult(null);
@@ -482,6 +584,7 @@ export function ScanScreen() {
         chefId: activeChefId ? Number(activeChefId) : null,
         deviceUuid: deviceUuid ?? null,
         syncKey: `manual-${pendingModal.scannedCode}-${today}-${Date.now()}`,
+        subEmployeeId: null,
       });
     }
 

@@ -122,28 +122,35 @@ export function getAllowedMealTypesForShift(
   const startHour = extractHour(shiftStartStr);
   const endHour = extractHour(shiftEndStr);
   const currentHour = scanTime.getHours();
+  const currentMinutes = scanTime.getHours() * 60 + scanTime.getMinutes();
+  const startMinutes = startHour * 60;
 
-  // Туслах функц: Интервалд байгаа эсэхийг шалгах
   const isBetween = (val: number, min: number, max: number) =>
     val >= min && val <= max;
 
-  /**
-   * АСУУДЛЫН ШИЙДЭЛ:
-   * Хэрэв одоо өглөө (06-11 цаг) байхад ажилчны ээлж орой (18-20 цагт) эхлэх гэж байгаа бол
-   * энэ хүн "сунасан" ээлж биш, зүгээр л өмнөх өдрийнхөө ажлаас буугаад
-   * эсвэл ажил эхлэхээс өмнө өглөөний хоол идэж байна гэж үзнэ.
-   */
+  // Ээлж эхлэхээс өмнөх хүлцэх хугацаа: 2 цаг
+  const PRE_SHIFT_WINDOW = 120; // минут
+
+  // 19:00 ажилдаа явдаг хүн 17:00-19:00-д оройн хоол идэж болно
+  const minutesUntilStart = startMinutes - currentMinutes;
+  const isPreShift =
+    minutesUntilStart > 0 && minutesUntilStart <= PRE_SHIFT_WINDOW;
+
   if (isBetween(currentHour, 6, 10) && isBetween(startHour, 18, 20)) {
-    return ["morning_meal"]; // Зөвхөн ердийн өглөөний хоол зөвшөөрнө
+    return ["morning_meal"];
   }
 
-  // 1. Өдрийн стандарт ээлж: 07/08 - 19/20
-  if (isBetween(startHour, 7, 8) && isBetween(endHour, 19, 20)) {
+  // 1. Өдрийн стандарт ээлж: 07/08 - 17/20
+  if (isBetween(startHour, 7, 8) && isBetween(endHour, 17, 20)) {
     return ["breakfast", "lunch", "dinner"];
   }
 
   // 2. Шөнийн стандарт ээлж: 19/20 - 07/08
   if (isBetween(startHour, 19, 20) && isBetween(endHour, 7, 8)) {
+    if (isPreShift) {
+      // Ажлаас 2 цагийн өмнө → зөвхөн dinner идэж болно
+      return ["dinner"];
+    }
     return ["dinner", "night_meal", "morning_meal"];
   }
 
@@ -152,9 +159,11 @@ export function getAllowedMealTypesForShift(
     return ["breakfast", "lunch"];
   }
 
-  // 4. Шөнийн уртасгасан ээлж (Жишээ нь: 19/20 - 12:00)
-  // Энэ нөхцөл зөвхөн ажил эхэлсний дараа буюу шөнө/өглөөдөө хүчинтэй
+  // 4. Шөнийн уртасгасан ээлж: 19/20 - 12:00
   if (isBetween(startHour, 19, 20) && endHour === 12) {
+    if (isPreShift) {
+      return ["dinner"];
+    }
     return ["dinner", "night_meal", "extend_morning_meal", "extend_lunch"];
   }
 

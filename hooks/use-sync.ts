@@ -8,6 +8,7 @@ import {
   pullChefs,
   pullMealLocationOverrides,
   pushMealLogs,
+  pullSubEmployees,
 } from "@/lib/sync/sync-engine";
 
 export type SyncState = "idle" | "syncing" | "success" | "error";
@@ -71,6 +72,7 @@ export function useSync() {
     return await executeSync(async () => {
       const count = await pullEmployees();
       await pullMealLocationOverrides();
+      await pullSubEmployees();
       return count;
     });
   }, [executeSync]);

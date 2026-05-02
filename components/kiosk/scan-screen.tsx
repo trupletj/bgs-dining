@@ -626,17 +626,19 @@ export function ScanScreen() {
       {/* Header — хоёуланд нийтлэг */}
       <div className="shrink-0 z-10">
         <StatusBar />
-        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2.5">
-          <CurrentMealDisplay />
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 border-b border-slate-800 bg-slate-950 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-2.5">
+          <div className="min-w-0 flex-1">
+            <CurrentMealDisplay />
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
             <button
               onClick={() => syncEmployees()}
               disabled={syncState === "syncing"}
-              className="flex items-center gap-2 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white">
+              className="flex min-w-0 items-center justify-center gap-2 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white">
               <RefreshCw
-                className={`h-4 w-4 ${syncState === "syncing" ? "animate-spin" : ""}`}
+                className={`h-4 w-4 shrink-0 ${syncState === "syncing" ? "animate-spin" : ""}`}
               />
-              <span className="hidden sm:inline">Шинэчлэх</span>
+              <span>Шинэчлэх</span>
             </button>
             <ManualEntry />
           </div>

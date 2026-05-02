@@ -28,7 +28,7 @@ export function HeartbeatIndicator() {
       }
     }
     checkStorage();
-    const interval = setInterval(checkStorage, 30000);
+    const interval = setInterval(checkStorage, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -50,7 +50,7 @@ export function HeartbeatIndicator() {
               <span
                 className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ${
                   isOnline && synced
-                    ? "bg-green-500 animate-pulse"
+                    ? "bg-green-500"
                     : isOnline && !synced
                       ? "bg-yellow-500"
                       : "bg-red-500"

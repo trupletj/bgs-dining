@@ -38,7 +38,7 @@ interface DuplicateInfo {
 
 type TabType = "employee" | "sub";
 
-export const ManualEntry = React.memo(() => {
+export const ManualEntry = React.memo(function ManualEntry() {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TabType>("employee");
   const [search, setSearch] = useState("");
@@ -130,6 +130,8 @@ export const ManualEntry = React.memo(() => {
       );
     }
 
+    const scannedAt = new Date().toISOString();
+
     await createMealLog({
       userId: employee.id,
       btegId: employee.employeeCode,
@@ -138,7 +140,7 @@ export const ManualEntry = React.memo(() => {
       mealType: targetMealType,
       diningHallId: Number(diningHallId),
       date: today,
-      scannedAt: new Date().toISOString(),
+      scannedAt,
       syncStatus: "pending",
       isExtraServing: false,
       isManualOverride: true,
@@ -146,7 +148,7 @@ export const ManualEntry = React.memo(() => {
       chefId: activeChefId ? Number(activeChefId) : null,
       deviceUuid: deviceUuid ?? null,
       subEmployeeId: null,
-      syncKey: `manual-${employee.id}-${targetMealType}-${today}-${Date.now()}`,
+      syncKey: `manual-${employee.id}-${targetMealType}-${today}-${scannedAt}`,
     });
 
     resetAndClose();
@@ -185,6 +187,8 @@ export const ManualEntry = React.memo(() => {
       if (linked) userId = linked.id;
     }
 
+    const scannedAt = new Date().toISOString();
+
     await createMealLog({
       userId,
       btegId: sub.btegId ?? "",
@@ -193,7 +197,7 @@ export const ManualEntry = React.memo(() => {
       mealType,
       diningHallId: Number(diningHallId),
       date: today,
-      scannedAt: new Date().toISOString(),
+      scannedAt,
       syncStatus: "pending",
       isExtraServing: false,
       isManualOverride: true,
@@ -201,7 +205,7 @@ export const ManualEntry = React.memo(() => {
       chefId: activeChefId ? Number(activeChefId) : null,
       deviceUuid: deviceUuid ?? null,
       subEmployeeId: sub.id,
-      syncKey: `manual-sub-${sub.id}-${mealType}-${today}-${Date.now()}`,
+      syncKey: `manual-sub-${sub.id}-${mealType}-${today}-${scannedAt}`,
     });
 
     resetAndClose();
@@ -293,28 +297,28 @@ export const ManualEntry = React.memo(() => {
   }, [duplicate, currentMeal, diningHallId, activeChefId, deviceUuid]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="flex items-center gap-2 rounded-xl bg-slate-800/60 backdrop-blur-sm border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 shadow-lg transition-all duration-200 hover:bg-slate-700/60 hover:border-white/15 hover:text-slate-100">
+        <button className="flex items-center gap-2 rounded-lg bg-slate-900 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-slate-100">
           <UserPlus className="h-4 w-4 text-blue-400" />
           Гараар бүртгэх
         </button>
       </DialogTrigger>
 
-      <DialogContent className="w-[calc(100%-2rem)] max-w-3xl bg-[rgba(15,23,42,0.85)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_60px_-10px_rgba(0,0,0,0.5)] rounded-2xl [&>button]:text-slate-400 [&>button]:hover:text-slate-200 [&>button]:hover:bg-white/5">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-3xl bg-slate-950 border border-slate-700 rounded-lg [&>button]:text-slate-400 [&>button]:hover:text-slate-200">
         <DialogHeader>
           <DialogTitle className="text-slate-100">Гараар бүртгэх</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
           {/* Tab */}
-          <div className="flex gap-1 rounded-xl bg-slate-800/50 p-1">
+          <div className="flex gap-1 rounded-lg bg-slate-900 p-1">
             <button
               onClick={() => {
                 setTab("employee");
                 setSearch("");
               }}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors ${
+              className={`flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium ${
                 tab === "employee"
                   ? "bg-blue-600 text-white"
                   : "text-slate-400 hover:text-slate-200"
@@ -327,7 +331,7 @@ export const ManualEntry = React.memo(() => {
                 setTab("sub");
                 setSearch("");
               }}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors ${
+              className={`flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium ${
                 tab === "sub"
                   ? "bg-blue-600 text-white"
                   : "text-slate-400 hover:text-slate-200"
@@ -348,7 +352,7 @@ export const ManualEntry = React.memo(() => {
                   ? "Нэр, код, хэлтсээр хайх..."
                   : "Гэрээт ажилчны нэрээр хайх..."
               }
-              className="pl-9 rounded-xl h-11 bg-slate-800/50 border-white/10 text-slate-100 placeholder:text-slate-500 focus:border-blue-400/50 focus:ring-blue-400/20"
+              className="pl-9 rounded-lg h-11 bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-blue-400/50 focus:ring-blue-400/20"
               autoFocus
             />
           </div>
@@ -366,7 +370,7 @@ export const ManualEntry = React.memo(() => {
                     <button
                       key={emp.id}
                       onClick={() => handleSelectEmployee(emp)}
-                      className="flex w-full items-center gap-3 rounded-xl bg-slate-800/40 border border-white/5 px-4 py-3 text-left hover:bg-slate-700/40 hover:border-white/10 transition-all duration-200">
+                      className="flex w-full items-center gap-3 rounded-lg bg-slate-900 border border-slate-800 px-4 py-3 text-left hover:bg-slate-800">
                       <div className="flex-1">
                         <p className="text-sm font-medium text-slate-100">
                           {emp.name}
@@ -398,7 +402,7 @@ export const ManualEntry = React.memo(() => {
                   <button
                     key={sub.id}
                     onClick={() => handleSelectSubEmployee(sub)}
-                    className="flex w-full items-center gap-3 rounded-xl bg-slate-800/40 border border-white/5 px-4 py-3 text-left hover:bg-slate-700/40 hover:border-white/10 transition-all duration-200">
+                    className="flex w-full items-center gap-3 rounded-lg bg-slate-900 border border-slate-800 px-4 py-3 text-left hover:bg-slate-800">
                     <div className="flex-1">
                       <p className="text-sm font-medium text-slate-100">
                         {sub.customLabel}

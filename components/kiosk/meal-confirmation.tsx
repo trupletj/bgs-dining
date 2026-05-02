@@ -53,12 +53,9 @@ export function MealConfirmationOverlay({
     <div
       className={`fixed inset-0 z-[100] flex items-center justify-center p-6 ${bgColor} bg-opacity-95`}
       onClick={onDismiss}>
-      <div className="flex flex-col items-center gap-4 md:gap-8 text-white text-center w-full max-w-lg animate-in fade-in zoom-in-95 duration-200">
-        <div className="relative">
-          <div className="absolute inset-0 scale-125 rounded-full border border-white/20" />
-          <div className="relative rounded-full bg-white/10 border border-white/20 p-4 md:p-6">
-            <Icon className="h-24 w-24 md:h-40 md:w-40" strokeWidth={2} />
-          </div>
+      <div className="flex w-full max-w-lg flex-col items-center gap-4 text-center text-white md:gap-8">
+        <div className="rounded-full bg-white/10 border border-white/20 p-4 md:p-6">
+          <Icon className="h-24 w-24 md:h-40 md:w-40" strokeWidth={2} />
         </div>
 
         <div className="space-y-2">

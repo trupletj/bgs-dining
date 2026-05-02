@@ -104,6 +104,8 @@ export const MEAL_TYPE_COLUMN_MAP: Record<string, string | null> = {
   snack: null, // No dedicated column; allow if user has any config
   dinner: "dinnerLocation",
   night_meal: "nightMealLocation",
+  extend_morning_meal: "morningMealLocation",
+  extend_lunch: "lunchLocation",
 };
 
 export const SCANNER_KEYSTROKE_THRESHOLD_MS = 50;
@@ -121,60 +123,58 @@ export function getAllowedMealTypesForShift(
 
   const startHour = extractHour(shiftStartStr);
   const endHour = extractHour(shiftEndStr);
-  const currentHour = scanTime.getHours();
-  const currentMinutes = scanTime.getHours() * 60 + scanTime.getMinutes();
-  const startMinutes = startHour * 60;
+  const scanDate = getLocalDate(scanTime);
+  const shiftStartDate = getLocalDateFromTimestamp(shiftStartStr);
+  const shiftEndDate = getLocalDateFromTimestamp(shiftEndStr);
 
   const isBetween = (val: number, min: number, max: number) =>
     val >= min && val <= max;
 
-  // Ээлж эхлэхээс өмнөх хүлцэх хугацаа: 2 цаг
-  const PRE_SHIFT_WINDOW = 120; // минут
-
-  // 19:00 ажилдаа явдаг хүн 17:00-19:00-д оройн хоол идэж болно
-  const minutesUntilStart = startMinutes - currentMinutes;
-  const isPreShift =
-    minutesUntilStart > 0 && minutesUntilStart <= PRE_SHIFT_WINDOW;
-
-  if (isBetween(currentHour, 6, 10) && isBetween(startHour, 18, 20)) {
-    return ["morning_meal"];
-  }
-
-  // 1. Өдрийн стандарт ээлж: 07/08 - 17/20
-  if (isBetween(startHour, 7, 8) && isBetween(endHour, 17, 20)) {
+  // 1. Өдрийн стандарт ээлж: 07/08 -> 18/19/20
+  if (
+    scanDate === shiftStartDate &&
+    isBetween(startHour, 7, 8) &&
+    isBetween(endHour, 18, 20)
+  ) {
     return ["breakfast", "lunch", "dinner"];
   }
 
-  // 2. Шөнийн стандарт ээлж: 19/20 - 07/08
-  if (isBetween(startHour, 19, 20) && isBetween(endHour, 7, 8)) {
-    if (isPreShift) {
-      // Ажлаас 2 цагийн өмнө → зөвхөн dinner идэж болно
-      return ["dinner"];
-    }
-    return ["dinner", "night_meal", "morning_meal"];
-  }
-
-  // 3. Өглөөний хагас ээлж: 07/08 - 12:00
-  if (isBetween(startHour, 7, 8) && endHour === 12) {
+  // 2. Өдрийн богино ээлж: 07/08 -> 12
+  if (
+    scanDate === shiftStartDate &&
+    isBetween(startHour, 7, 8) &&
+    endHour === 12
+  ) {
     return ["breakfast", "lunch"];
   }
 
-  // 4. Шөнийн уртасгасан ээлж: 19/20 - 12:00
-  if (isBetween(startHour, 19, 20) && endHour === 12) {
-    if (isPreShift) {
-      return ["dinner"];
-    }
-    return ["dinner", "night_meal", "extend_morning_meal", "extend_lunch"];
+  // 3. Энгийн шөнийн ээлж: 18/19/20 -> next day 07/08
+  if (isBetween(startHour, 18, 20) && isBetween(endHour, 7, 8)) {
+    if (scanDate === shiftStartDate) return ["dinner", "night_meal"];
+    if (scanDate === shiftEndDate) return ["morning_meal"];
   }
 
-  // 5. Өдрийн дунд ээлж: 12/13 - 18/19
-  if (isBetween(startHour, 12, 13) && isBetween(endHour, 18, 19)) {
+  // 4. Сунгасан шөнийн ээлж: 18/19/20 -> next day 12
+  if (isBetween(startHour, 18, 20) && endHour === 12) {
+    if (scanDate === shiftStartDate) return ["dinner", "night_meal"];
+    if (scanDate === shiftEndDate) {
+      return ["extend_morning_meal", "extend_lunch"];
+    }
+  }
+
+  // 5. Зөрж ирж буй өдрийн дунд ээлж: 12/13 -> 19/20
+  if (
+    scanDate === shiftStartDate &&
+    isBetween(startHour, 12, 13) &&
+    isBetween(endHour, 19, 20)
+  ) {
     return ["lunch", "dinner"];
   }
 
-  // 6. Харуулын диспичер: 12/13 - 7/8
+  // 6. 12/13 -> next day 07/08
   if (isBetween(startHour, 12, 13) && isBetween(endHour, 7, 8)) {
-    return ["lunch", "dinner", "night_meal", "morning_meal"];
+    if (scanDate === shiftStartDate) return ["lunch", "dinner", "night_meal"];
+    if (scanDate === shiftEndDate) return ["morning_meal"];
   }
 
   return [];
@@ -191,14 +191,26 @@ function extractHour(dateStr: string): number {
   return parseInt(dateStr.split(":")[0], 10);
 }
 
-export const getLocalDate = (): string => {
+export const getLocalDate = (date: Date = new Date()): string => {
+  return getLocalDateFromDate(date);
+};
+
+export const getLocalDateFromDate = (date: Date): string => {
   return new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     timeZone: "Asia/Ulaanbaatar",
-  }).format(new Date());
+  }).format(date);
 };
+
+function getLocalDateFromTimestamp(timestamp: string): string {
+  const normalized = timestamp.includes("T")
+    ? timestamp
+    : timestamp.replace(" ", "T");
+
+  return normalized.slice(0, 10);
+}
 
 export function resolveTargetMealType(
   allowedMeals: string[],

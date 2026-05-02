@@ -18,7 +18,7 @@ export function useCurrentMeal() {
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(new Date());
-    }, 30000);
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 

@@ -1,6 +1,6 @@
 import { db, Employee, type SyncLog } from "@/lib/db";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { KIOSK_CONFIG_KEYS } from "@/lib/constants";
+import { getLocalDate, KIOSK_CONFIG_KEYS } from "@/lib/constants";
 
 const BATCH_SIZE = 100;
 
@@ -10,8 +10,16 @@ export type SyncResults = {
   chefsPulled: number;
   timeSlotsPulled: number;
   overridesPulled: number;
+  subMealPlansPulled: number;
+  expectedMealCountsPulled: number;
   logsPushed: number;
   isOffline?: boolean;
+};
+
+type ExpectedMealRow = {
+  meal_type: string | null;
+  expected_count: number | string | null;
+  actual_count: number | string | null;
 };
 
 async function logSync(
@@ -42,7 +50,7 @@ export async function pullEmployees(): Promise<number> {
   try {
     const supabase = await getSupabaseClient();
 
-    let query = supabase.from("users_with_stats").select("*");
+    const query = supabase.from("users_with_stats").select("*");
 
     const { data: allData, error } = await query;
     if (error) throw error;
@@ -371,7 +379,7 @@ export async function pullMealTimeSlots(): Promise<number> {
 
 export async function pullSubEmployees(): Promise<number> {
   if (!navigator.onLine) return 0;
-  const logId = await logSync("pull-employees", "started", 0);
+  const logId = await logSync("pull-sub-employees", "started", 0);
 
   try {
     const supabase = await getSupabaseClient();
@@ -382,9 +390,8 @@ export async function pullSubEmployees(): Promise<number> {
       .eq("is_active", true);
 
     if (error) throw error;
-    if (!data || data.length === 0) return 0;
 
-    const mapped = data.map((row) => ({
+    const mapped = (data || []).map((row) => ({
       id: row.id as string,
       orgId: row.org_id as string,
       customLabel: row.custom_label ?? "",
@@ -395,6 +402,134 @@ export async function pullSubEmployees(): Promise<number> {
     await db.transaction("rw", db.subEmployees, async () => {
       await db.subEmployees.clear();
       await db.subEmployees.bulkAdd(mapped);
+    });
+
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "success",
+        recordCount: mapped.length,
+        completedAt: new Date().toISOString(),
+      });
+    }
+
+    return mapped.length;
+  } catch (error) {
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "failed",
+        completedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    throw error;
+  }
+}
+
+export async function pullSubEmployeeMealPlans(): Promise<number> {
+  if (!navigator.onLine) return 0;
+  const logId = await logSync("pull-sub-meal-plans", "started", 0);
+
+  try {
+    const diningHallId = await getDiningHallId();
+    if (!diningHallId) return 0;
+
+    const supabase = await getSupabaseClient();
+    const today = getLocalDate();
+
+    const { data, error } = await supabase
+      .from("sub_employee_meal_plans")
+      .select(
+        "id, org_id, dining_hall_id, date, breakfast_count, morning_meal_count, lunch_count, dinner_count, night_meal_count",
+      )
+      .eq("date", today)
+      .eq("dining_hall_id", diningHallId);
+
+    if (error) throw error;
+
+    const mapped = (data || []).map((row) => ({
+      id: row.id as string,
+      orgId: row.org_id as string,
+      diningHallId: row.dining_hall_id as number,
+      date: row.date as string,
+      breakfastCount: Number(row.breakfast_count || 0),
+      morningMealCount: Number(row.morning_meal_count || 0),
+      lunchCount: Number(row.lunch_count || 0),
+      dinnerCount: Number(row.dinner_count || 0),
+      nightMealCount: Number(row.night_meal_count || 0),
+    }));
+
+    await db.transaction("rw", db.subEmployeeMealPlans, async () => {
+      await db.subEmployeeMealPlans.clear();
+      await db.subEmployeeMealPlans.bulkAdd(mapped);
+    });
+
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "success",
+        recordCount: mapped.length,
+        completedAt: new Date().toISOString(),
+      });
+    }
+
+    return mapped.length;
+  } catch (error) {
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "failed",
+        completedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    throw error;
+  }
+}
+
+export async function pullExpectedMealCounts(): Promise<number> {
+  if (!navigator.onLine) return 0;
+  const logId = await logSync("pull-expected-meal-counts", "started", 0);
+
+  try {
+    const diningHallId = await getDiningHallId();
+    if (!diningHallId) return 0;
+
+    const supabase = await getSupabaseClient();
+    const today = getLocalDate();
+
+    const { data, error } = await supabase.rpc("get_meal_expected_vs_actual", {
+      p_date: today,
+      p_hall_id: diningHallId,
+    });
+
+    if (error) throw error;
+
+    const totals = new Map<string, { expectedCount: number; actualCount: number }>();
+    for (const row of (data || []) as ExpectedMealRow[]) {
+      if (!row.meal_type) continue;
+
+      const current = totals.get(row.meal_type) || {
+        expectedCount: 0,
+        actualCount: 0,
+      };
+      current.expectedCount += Number(row.expected_count || 0);
+      current.actualCount += Number(row.actual_count || 0);
+      totals.set(row.meal_type, current);
+    }
+
+    const mapped = Array.from(totals, ([mealType, counts]) => ({
+      id: `${today}-${diningHallId}-${mealType}`,
+      diningHallId,
+      date: today,
+      mealType,
+      expectedCount: counts.expectedCount,
+      actualCount: counts.actualCount,
+    }));
+
+    await db.transaction("rw", db.expectedMealCounts, async () => {
+      await db.expectedMealCounts
+        .where("[date+diningHallId]")
+        .equals([today, diningHallId])
+        .delete();
+      await db.expectedMealCounts.bulkPut(mapped);
     });
 
     if (typeof logId === "number") {
@@ -514,6 +649,8 @@ export async function runFullSync(): Promise<SyncResults> {
     chefsPulled: 0,
     timeSlotsPulled: 0,
     overridesPulled: 0,
+    subMealPlansPulled: 0,
+    expectedMealCountsPulled: 0,
     logsPushed: 0,
   };
   if (!navigator.onLine) {
@@ -593,6 +730,16 @@ export async function runFullSync(): Promise<SyncResults> {
     await pullSubEmployees();
   } catch (e) {
     console.error("Pull sub employees failed:", e);
+  }
+  try {
+    results.subMealPlansPulled = await pullSubEmployeeMealPlans();
+  } catch (e) {
+    console.error("Pull sub employee meal plans failed:", e);
+  }
+  try {
+    results.expectedMealCountsPulled = await pullExpectedMealCounts();
+  } catch (e) {
+    console.error("Pull expected meal counts failed:", e);
   }
   try {
     results.overridesPulled = await pullMealLocationOverrides();

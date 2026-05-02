@@ -28,14 +28,22 @@ import {
   getLocalDate,
   KIOSK_CONFIG_KEYS,
   MEAL_NAME_MAP,
+  resolveTargetMealType,
 } from "@/lib/constants";
 import { ScrollArea } from "../ui/scroll-area";
 
 type ScanState = "idle" | "processing" | "result";
 
+interface ScannedQrData {
+  sub_id?: string | number | null;
+  bteg_id?: string | number | null;
+  id_card_number?: string | number | null;
+}
+
 interface PendingModal {
   type: "unauthorized" | "double-scan";
   employee?: Employee;
+  subEmployee?: { id: string; name: string; btegId?: string };
   scannedCode: string;
   btegId?: string;
   message: string;
@@ -124,6 +132,96 @@ export function ScanScreen() {
     [diningHallId, activeChefId, deviceUuid],
   );
 
+  const handleSubEmployeeScan = useCallback(
+    async (subId: string, btegId: string | null) => {
+      if (!currentMeal || !diningHallId) {
+        setConfirmationResult({
+          type: "warning",
+          title: "Хоолны цаг биш",
+          message: "Одоогоор хоолны цаг эхлээгүй байна",
+        });
+        setScanStateWithRef("result");
+        return;
+      }
+
+      const subEmployee = await db.subEmployees.get(subId);
+
+      if (!subEmployee || !subEmployee.isActive) {
+        playSound("error");
+        setConfirmationResult({
+          type: "error",
+          title: "Бүртгэлгүй",
+          message: "Гэрээт ажилчны QR код танигдсангүй",
+        });
+        setScanStateWithRef("result");
+        return;
+      }
+
+      const today = getLocalDate();
+      const mealType = currentMeal.mealType;
+
+      const existing = await db.mealLogs
+        .where("subEmployeeId")
+        .equals(subId)
+        .and((log) => log.mealType === mealType && log.date === today)
+        .first();
+
+      if (existing) {
+        setPendingModal({
+          type: "double-scan",
+          employee: {
+            name: subEmployee.customLabel,
+            id: "",
+            employeeCode: btegId ?? "",
+            idcardNumber: "",
+            phone: "",
+            department: "",
+            position: "",
+            heltesName: "",
+            isActive: true,
+            shiftStart: "",
+            shiftEnd: "",
+          },
+          subEmployee: {
+            id: subId,
+            name: subEmployee.customLabel,
+            btegId: btegId ?? undefined,
+          },
+          scannedCode: subId,
+          btegId: btegId ?? "",
+          assignedLocationId: Number(diningHallId),
+          targetMealType: mealType,
+          message: `${subEmployee.customLabel} аль хэдийн бүртгүүлсэн`,
+          existingLog: existing,
+        });
+        setScanStateWithRef("idle");
+        return;
+      }
+
+      await doCreateLog({
+        subEmployee: {
+          id: subId,
+          name: subEmployee.customLabel,
+          btegId: btegId ?? undefined,
+        },
+        isExtraServing: false,
+        mealType,
+        isManualOverride: false,
+      });
+
+      playSound("success");
+      setConfirmationResult({
+        type: "success",
+        title: "Амжилттай",
+        message: "Гэрээт ажилчны бүртгэл хийгдлээ",
+        employeeName: subEmployee.customLabel,
+        mealName: getMealName(mealType),
+      });
+      setScanStateWithRef("result");
+    },
+    [currentMeal, diningHallId, doCreateLog, playSound, setScanStateWithRef],
+  );
+
   const handleScan = useCallback(
     async (code: string) => {
       const now = Date.now();
@@ -156,10 +254,10 @@ export function ScanScreen() {
 
       try {
         // 1. QR код задлах
-        let qrData: any = null;
+        let qrData: ScannedQrData | null = null;
         try {
           qrData = JSON.parse(code);
-        } catch (e) {
+        } catch {
           playSound("error");
           setConfirmationResult({
             type: "error",
@@ -173,7 +271,10 @@ export function ScanScreen() {
         const subId = qrData?.sub_id ? String(qrData.sub_id) : null;
 
         if (subId) {
-          await handleSubEmployeeScan(subId, qrData?.bteg_id ?? null);
+          await handleSubEmployeeScan(
+            subId,
+            qrData?.bteg_id ? String(qrData.bteg_id) : null,
+          );
           return;
         }
 
@@ -261,27 +362,10 @@ export function ScanScreen() {
           employee.shiftEnd,
           new Date(),
         );
-        let targetMealType = currentMeal.mealType;
-
-        if (!allowedMeals.includes(targetMealType)) {
-          if (
-            targetMealType === "lunch" &&
-            allowedMeals.includes("extend_lunch")
-          ) {
-            targetMealType = "extend_lunch";
-          } else if (
-            (targetMealType === "breakfast" ||
-              targetMealType === "morning_meal") &&
-            allowedMeals.includes("extend_morning_meal")
-          ) {
-            targetMealType = "extend_morning_meal";
-          } else if (
-            targetMealType === "breakfast" &&
-            allowedMeals.includes("morning_meal")
-          ) {
-            targetMealType = "morning_meal";
-          }
-        }
+        const targetMealType = resolveTargetMealType(
+          allowedMeals,
+          currentMeal.mealType,
+        );
 
         if (!allowedMeals.includes(targetMealType)) {
           setPendingModal({
@@ -392,99 +476,11 @@ export function ScanScreen() {
       }
     },
     // 5. Dependency-ээс scanState хасагдаж, setScanStateWithRef нэмэгдсэн
-    [currentMeal, diningHallId, doCreateLog, playSound, setScanStateWithRef],
-  );
-
-  const handleSubEmployeeScan = useCallback(
-    async (subId: string, btegId: string | null) => {
-      if (!currentMeal || !diningHallId) {
-        setConfirmationResult({
-          type: "warning",
-          title: "Хоолны цаг биш",
-          message: "Одоогоор хоолны цаг эхлээгүй байна",
-        });
-        setScanStateWithRef("result");
-        return;
-      }
-
-      // 1. SubEmployee DB-ээс хайх
-      const subEmployee = await db.subEmployees.get(subId);
-
-      if (!subEmployee || !subEmployee.isActive) {
-        playSound("error");
-        setConfirmationResult({
-          type: "error",
-          title: "Бүртгэлгүй",
-          message: "Гэрээт ажилчны QR код танигдсангүй",
-        });
-        setScanStateWithRef("result");
-        return;
-      }
-
-      const today = getLocalDate();
-      const mealType = currentMeal.mealType;
-
-      // 2. Давхардал шалгах — subEmployeeId-аар
-      const existing = await db.mealLogs
-        .where("subEmployeeId")
-        .equals(subId)
-        .and((log) => log.mealType === mealType && log.date === today)
-        .first();
-
-      if (existing) {
-        // Давхар скан
-        setPendingModal({
-          type: "double-scan",
-          employee: {
-            name: subEmployee.customLabel,
-            id: "",
-            employeeCode: btegId ?? "",
-            idcardNumber: "",
-            phone: "",
-            department: "",
-            position: "",
-            heltesName: "",
-            isActive: true,
-            shiftStart: "",
-            shiftEnd: "",
-          },
-          scannedCode: subId,
-          btegId: btegId ?? "",
-          assignedLocationId: Number(diningHallId),
-          targetMealType: mealType,
-          message: `${subEmployee.customLabel} аль хэдийн бүртгүүлсэн`,
-          existingLog: existing,
-        });
-        setScanStateWithRef("idle");
-        return;
-      }
-
-      await doCreateLog({
-        subEmployee: {
-          id: subId,
-          name: subEmployee.customLabel,
-          btegId: btegId ?? undefined,
-        },
-        isExtraServing: false,
-        mealType,
-        isManualOverride: false,
-      });
-
-      playSound("success");
-      setConfirmationResult({
-        type: "success",
-        title: "Амжилттай",
-        message: "Гэрээт ажилчны бүртгэл хийгдлээ",
-        employeeName: subEmployee.customLabel,
-        mealName: getMealName(mealType),
-      });
-      setScanStateWithRef("result");
-    },
     [
       currentMeal,
       diningHallId,
-      activeChefId,
-      deviceUuid,
+      doCreateLog,
+      handleSubEmployeeScan,
       playSound,
       setScanStateWithRef,
     ],
@@ -517,25 +513,10 @@ export function ScanScreen() {
         new Date(),
       );
 
-      if (!allowedMeals.includes(targetMealType)) {
-        if (
-          targetMealType === "lunch" &&
-          allowedMeals.includes("extend_lunch")
-        ) {
-          targetMealType = "extend_lunch";
-        } else if (
-          (targetMealType === "breakfast" ||
-            targetMealType === "morning_meal") &&
-          allowedMeals.includes("extend_morning_meal")
-        ) {
-          targetMealType = "extend_morning_meal";
-        } else if (
-          targetMealType === "breakfast" &&
-          allowedMeals.includes("morning_meal")
-        ) {
-          targetMealType = "morning_meal";
-        }
-      }
+      targetMealType = resolveTargetMealType(
+        allowedMeals,
+        currentMeal.mealType,
+      );
 
       const override = await db.mealLocationOverrides
         .where("[userId+date+mealType]")
@@ -610,12 +591,14 @@ export function ScanScreen() {
   ]);
 
   const handleAddExtraServing = useCallback(async () => {
-    if (!pendingModal?.employee || !currentMeal) return;
+    if ((!pendingModal?.employee && !pendingModal?.subEmployee) || !currentMeal)
+      return;
 
     const correctMealType = pendingModal.targetMealType || currentMeal.mealType;
 
     await doCreateLog({
       employee: pendingModal.employee,
+      subEmployee: pendingModal.subEmployee,
       isExtraServing: true,
       mealType: correctMealType,
       isManualOverride: false,
@@ -626,7 +609,7 @@ export function ScanScreen() {
       type: "success",
       title: "Нэмэлт порц",
       message: "Нэмэлт порц бүртгэгдлээ",
-      employeeName: pendingModal.employee.name,
+      employeeName: pendingModal.employee?.name ?? pendingModal.subEmployee?.name,
       mealName: getMealName(correctMealType),
     });
     setScanStateWithRef("result");
@@ -639,17 +622,17 @@ export function ScanScreen() {
   });
 
   return (
-    <div className="flex h-dvh flex-col select-none bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="flex h-dvh flex-col select-none bg-slate-950">
       {/* Header — хоёуланд нийтлэг */}
       <div className="shrink-0 z-10">
         <StatusBar />
-        <div className="flex items-center justify-between border-b border-white/5 bg-slate-900/40 px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2.5">
           <CurrentMealDisplay />
           <div className="flex items-center gap-2">
             <button
               onClick={() => syncEmployees()}
               disabled={syncState === "syncing"}
-              className="flex items-center gap-2 rounded-xl bg-slate-800/60 border border-white/10 px-3 py-2 text-sm text-slate-300 hover:text-white">
+              className="flex items-center gap-2 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white">
               <RefreshCw
                 className={`h-4 w-4 ${syncState === "syncing" ? "animate-spin" : ""}`}
               />
@@ -667,11 +650,11 @@ export function ScanScreen() {
           {/* <CameraScanner onScan={handleScan} /> */}
         </div>
         <div
-          className={`relative border-l border-white/5 bg-slate-900/40 transition-all duration-500 ease-in-out ${activeMeals.length === 2 ? "flex-[2] w-[600px]" : "flex-[0.8] w-80"}`}>
+          className={`relative border-l border-slate-800 bg-slate-950 ${activeMeals.length === 2 ? "flex-[2] w-[600px]" : "flex-[0.8] w-80"}`}>
           {activeMeals.length === 2 ? (
             <div className="flex h-full w-full">
-              <div className="flex flex-1 flex-col border-r border-white/5 bg-slate-900/20">
-                <div className="p-3 border-b border-white/5 bg-slate-900/40">
+              <div className="flex flex-1 flex-col border-r border-slate-800 bg-slate-950">
+                <div className="p-3 border-b border-slate-800 bg-slate-950">
                   <h3 className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70">
                     Гал тогоо (Давхар ээлж)
                   </h3>
@@ -690,7 +673,7 @@ export function ScanScreen() {
             </div>
           ) : (
             <div className="flex h-full flex-col">
-              <div className="border-b border-white/5 bg-slate-900/40">
+              <div className="border-b border-slate-800 bg-slate-950">
                 {activeMeals.length > 0 ? (
                   activeMeals.map((meal) => (
                     <ChefDashboard key={meal.id} mealSlot={meal} />
@@ -716,7 +699,7 @@ export function ScanScreen() {
             <IdleScreen />
             <CameraScanner onScan={handleScan} id="camera-scanner-mobile" />
           </div>
-          <div className="border-t border-white/5">
+          <div className="border-t border-slate-800">
             {activeMeals.map((meal) => (
               <ChefDashboard key={meal.id} mealSlot={meal} />
             ))}

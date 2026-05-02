@@ -13,18 +13,23 @@ interface MealLogFilters {
 
 export function useMealLogs(filters: MealLogFilters = {}) {
   const logs = useLiveQuery(() => {
-    return db.mealLogs
-      .orderBy("scannedAt")
-      .reverse()
+    const query = filters.date
+      ? db.mealLogs.where("date").equals(filters.date)
+      : db.mealLogs.toCollection();
+
+    return query
+      .filter((r) => {
+        if (filters.mealType && r.mealType !== filters.mealType) return false;
+        if (filters.diningHallId && r.diningHallId !== filters.diningHallId)
+          return false;
+        return true;
+      })
       .toArray()
       .then((results) =>
-        results.filter((r) => {
-          if (filters.date && r.date !== filters.date) return false;
-          if (filters.mealType && r.mealType !== filters.mealType) return false;
-          if (filters.diningHallId && r.diningHallId !== filters.diningHallId)
-            return false;
-          return true;
-        }),
+        results.sort(
+          (a, b) =>
+            new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime(),
+        ),
       );
   }, [filters.date, filters.mealType, filters.diningHallId]);
 

@@ -29,7 +29,6 @@ export function CameraScanner({
           overflow: "hidden",
           borderRadius: "16px",
           background: "rgba(30,41,59,0.5)",
-          transition: "height 0.3s ease",
         }}
       />
 
@@ -39,7 +38,7 @@ export function CameraScanner({
 
       <button
         onClick={isStarted ? stop : start}
-        className="flex items-center gap-2 rounded-xl bg-slate-800/60 backdrop-blur-sm border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 shadow-lg transition-all duration-200 hover:bg-slate-700/60 hover:text-slate-100">
+        className="flex items-center gap-2 rounded-lg bg-slate-900 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-slate-100">
         {isStarted ? (
           <>
             <CameraOff className="h-4 w-4 text-red-400" />

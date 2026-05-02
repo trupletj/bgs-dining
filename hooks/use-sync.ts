@@ -9,6 +9,8 @@ import {
   pullMealLocationOverrides,
   pushMealLogs,
   pullSubEmployees,
+  pullSubEmployeeMealPlans,
+  pullExpectedMealCounts,
 } from "@/lib/sync/sync-engine";
 
 export type SyncState = "idle" | "syncing" | "success" | "error";
@@ -24,7 +26,7 @@ export function useSync() {
    * Нийтлэг синк хийх загвар (Wrapper function)
    * Энэ нь бүх синк функцүүдэд ижил "хаалт" болон "төлөв" хянах боломжийг олгоно.
    */
-  const executeSync = useCallback(async (syncFn: () => Promise<any>) => {
+  const executeSync = useCallback(async <T,>(syncFn: () => Promise<T>) => {
     if (typeof window !== "undefined" && !navigator.onLine) {
       console.log("Оффлайн горим: Дотоод датаг ашиглаж байна.");
       return;
@@ -73,6 +75,8 @@ export function useSync() {
       const count = await pullEmployees();
       await pullMealLocationOverrides();
       await pullSubEmployees();
+      await pullSubEmployeeMealPlans();
+      await pullExpectedMealCounts();
       return count;
     });
   }, [executeSync]);

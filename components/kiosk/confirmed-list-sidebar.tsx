@@ -28,7 +28,7 @@ export function ConfirmedListSidebar() {
           <Users className="h-3.5 w-3.5 shrink-0 text-blue-400" />
         </div>
         <h3 className="text-sm font-semibold text-slate-200">Бүртгүүлсэн</h3>
-        <span className="ml-auto rounded-full bg-gradient-to-r from-blue-500 to-blue-600 px-2.5 py-0.5 text-xs font-semibold text-white shadow-lg shadow-blue-500/20">
+        <span className="ml-auto rounded bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">
           {logs.length}
         </span>
       </div>
@@ -41,10 +41,10 @@ export function ConfirmedListSidebar() {
           </div>
         ) : (
           <ul className="space-y-1.5 p-2">
-            {logs.map((log, index) => (
+            {logs.map((log) => (
               <li
                 key={log.id}
-                className="group relative flex items-start gap-3 overflow-hidden rounded-xl bg-slate-800/40 border border-white/5 px-3 py-2.5 transition-all hover:bg-slate-800/60 hover:border-white/10  fade-in-0 duration-300">
+                className="flex items-start gap-3 rounded-lg bg-slate-900 border border-slate-800 px-3 py-2.5">
                 <div className="mt-0.5 flex items-center justify-center rounded-md bg-emerald-500/15 border border-emerald-400/20 p-1">
                   <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-400" />
                 </div>

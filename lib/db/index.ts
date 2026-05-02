@@ -1,12 +1,44 @@
 import Dexie, { type EntityTable } from "dexie";
 import { DB_NAME } from "@/lib/constants";
 
+interface LegacyMealConfirmation {
+  employeeId?: string;
+  employeeCode?: string;
+  employeeName?: string;
+  mealSlotId?: string;
+  diningHallId?: number | string;
+  date?: string;
+  confirmedAt?: string;
+  syncStatus?: string;
+}
+
 export interface SubEmployee {
   id: string;
   orgId: string;
   customLabel: string;
   btegId: string | null;
   isActive: boolean;
+}
+
+export interface SubEmployeeMealPlan {
+  id: string;
+  orgId: string;
+  diningHallId: number;
+  date: string;
+  breakfastCount: number;
+  morningMealCount: number;
+  lunchCount: number;
+  dinnerCount: number;
+  nightMealCount: number;
+}
+
+export interface ExpectedMealCount {
+  id: string;
+  diningHallId: number;
+  date: string;
+  mealType: string;
+  expectedCount: number;
+  actualCount: number;
 }
 
 export interface Employee {
@@ -101,6 +133,9 @@ export interface SyncLog {
     | "pull-employees"
     | "pull-dining-halls"
     | "pull-chefs"
+    | "pull-sub-employees"
+    | "pull-sub-meal-plans"
+    | "pull-expected-meal-counts"
     | "pull-overrides"
     | "pull-time-slots"
     | "push-meal-logs"
@@ -115,6 +150,8 @@ export interface SyncLog {
 class CanteenDB extends Dexie {
   employees!: EntityTable<Employee, "id">;
   subEmployees!: EntityTable<SubEmployee, "id">;
+  subEmployeeMealPlans!: EntityTable<SubEmployeeMealPlan, "id">;
+  expectedMealCounts!: EntityTable<ExpectedMealCount, "id">;
   userMealConfigs!: EntityTable<UserMealConfig, "userId">;
   mealLogs!: EntityTable<MealLog, "id">;
   mealTimeSlots!: EntityTable<MealTimeSlot, "id">;
@@ -165,8 +202,9 @@ class CanteenDB extends Dexie {
           const oldTable = tx.table("mealConfirmations");
           const oldRecords = await oldTable.toArray();
           if (oldRecords.length > 0) {
-            const newLogs = oldRecords.map((old: any) => ({
-              userId: old.employeeId,
+            const newLogs = (oldRecords as LegacyMealConfirmation[]).map((old) => ({
+              userId: old.employeeId || "",
+              btegId: "",
               idcardNumber: old.employeeCode || "",
               employeeName: old.employeeName || "",
               mealType: old.mealSlotId || "",
@@ -176,13 +214,15 @@ class CanteenDB extends Dexie {
               syncStatus: old.syncStatus === "synced" ? "synced" : "pending",
               isExtraServing: false,
               isManualOverride: false,
+              isWrongLocation: false,
               chefId: null,
               deviceUuid: null,
+              subEmployeeId: null,
               syncKey: `migrated-${old.employeeId}-${old.mealSlotId}-${old.date}`,
             }));
             await tx.table("mealLogs").bulkAdd(newLogs);
           }
-        } catch (e) {
+        } catch {
           // mealConfirmations байхгүй бол алгасна
         }
       });
@@ -220,6 +260,13 @@ class CanteenDB extends Dexie {
     this.version(10).stores({
       mealLogs:
         "++id, [userId+mealType+date], idcardNumber, mealType, date, diningHallId, syncStatus, scannedAt, syncKey, subEmployeeId",
+    });
+    this.version(11).stores({
+      subEmployeeMealPlans: "id, date, diningHallId, [date+diningHallId]",
+    });
+    this.version(12).stores({
+      expectedMealCounts:
+        "id, date, diningHallId, [date+diningHallId], mealType",
     });
   }
 }

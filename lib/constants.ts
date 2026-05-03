@@ -183,12 +183,13 @@ export function getAllowedMealTypesForShift(
 function extractHour(dateStr: string): number {
   if (!dateStr) return -1;
 
-  if (dateStr.includes("T")) {
-    const timePart = dateStr.split("T")[1];
-    return parseInt(timePart.split(":")[0], 10);
-  }
+  const normalized = dateStr.trim().replace("T", " ");
+  const timePart = normalized.includes(" ")
+    ? normalized.split(" ").at(-1) || ""
+    : normalized;
+  const hour = parseInt(timePart.split(":")[0], 10);
 
-  return parseInt(dateStr.split(":")[0], 10);
+  return Number.isFinite(hour) ? hour : -1;
 }
 
 export const getLocalDate = (date: Date = new Date()): string => {

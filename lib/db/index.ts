@@ -86,6 +86,20 @@ export interface MealLog {
   subEmployeeId: string | null;
 }
 
+export interface ServerMealLogCache {
+  syncKey: string;
+  userId: string | null;
+  subEmployeeId: string | null;
+  btegId: string;
+  mealType: string;
+  date: string;
+  diningHallId: number;
+  deviceUuid: string | null;
+  isExtraServing: boolean;
+  scannedAt: string;
+  fetchedAt: string;
+}
+
 export interface MealTimeSlot {
   id: number;
   diningHallId: number;
@@ -136,6 +150,7 @@ export interface SyncLog {
     | "pull-sub-employees"
     | "pull-sub-meal-plans"
     | "pull-expected-meal-counts"
+    | "pull-server-meal-log-cache"
     | "pull-overrides"
     | "pull-time-slots"
     | "push-meal-logs"
@@ -152,6 +167,7 @@ class CanteenDB extends Dexie {
   subEmployees!: EntityTable<SubEmployee, "id">;
   subEmployeeMealPlans!: EntityTable<SubEmployeeMealPlan, "id">;
   expectedMealCounts!: EntityTable<ExpectedMealCount, "id">;
+  serverMealLogCache!: EntityTable<ServerMealLogCache, "syncKey">;
   userMealConfigs!: EntityTable<UserMealConfig, "userId">;
   mealLogs!: EntityTable<MealLog, "id">;
   mealTimeSlots!: EntityTable<MealTimeSlot, "id">;
@@ -267,6 +283,10 @@ class CanteenDB extends Dexie {
     this.version(12).stores({
       expectedMealCounts:
         "id, date, diningHallId, [date+diningHallId], mealType",
+    });
+    this.version(13).stores({
+      serverMealLogCache:
+        "syncKey, [diningHallId+date+mealType], [userId+mealType+date], [subEmployeeId+mealType+date], fetchedAt",
     });
   }
 }

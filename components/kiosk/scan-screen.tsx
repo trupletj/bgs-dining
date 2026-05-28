@@ -24,6 +24,10 @@ import { db, type Employee, type MealLog } from "@/lib/db";
 import { checkDuplicateMealLog, createMealLog } from "@/hooks/use-meal-logs";
 import { getMealLocationForSlot } from "@/lib/meal-type-map";
 import {
+  findNormalMealLogInCache,
+  isDifferentDeviceConflict,
+} from "@/lib/sync/meal-log-conflicts";
+import {
   getAllowedMealTypesForShift,
   getLocalDate,
   KIOSK_CONFIG_KEYS,
@@ -198,6 +202,39 @@ export function ScanScreen() {
         return;
       }
 
+      const cachedExisting = await findNormalMealLogInCache({
+        subEmployeeId: subId,
+        mealType,
+        date: today,
+        diningHallId: Number(diningHallId),
+      });
+      if (
+        cachedExisting &&
+        isDifferentDeviceConflict(deviceUuid, cachedExisting.deviceUuid)
+      ) {
+        await doCreateLog({
+          subEmployee: {
+            id: subId,
+            name: subEmployee.customLabel,
+            btegId: btegId ?? undefined,
+          },
+          isExtraServing: true,
+          mealType,
+          isManualOverride: false,
+        });
+
+        playSound("success");
+        setConfirmationResult({
+          type: "success",
+          title: "Нэмэлт порц",
+          message: "Өөр киоск дээр бүртгэгдсэн тул нэмэлт порцоор хадгаллаа",
+          employeeName: subEmployee.customLabel,
+          mealName: getMealName(mealType),
+        });
+        setScanStateWithRef("result");
+        return;
+      }
+
       await doCreateLog({
         subEmployee: {
           id: subId,
@@ -219,7 +256,14 @@ export function ScanScreen() {
       });
       setScanStateWithRef("result");
     },
-    [currentMeal, diningHallId, doCreateLog, playSound, setScanStateWithRef],
+    [
+      currentMeal,
+      diningHallId,
+      deviceUuid,
+      doCreateLog,
+      playSound,
+      setScanStateWithRef,
+    ],
   );
 
   const handleScan = useCallback(
@@ -454,6 +498,34 @@ export function ScanScreen() {
           return;
         }
 
+        const cachedExisting = await findNormalMealLogInCache({
+          userId: employee.id,
+          mealType: targetMealType,
+          date: today,
+          diningHallId: Number(diningHallId),
+        });
+        if (
+          cachedExisting &&
+          isDifferentDeviceConflict(deviceUuid, cachedExisting.deviceUuid)
+        ) {
+          await doCreateLog({
+            employee,
+            isExtraServing: true,
+            mealType: targetMealType,
+            isManualOverride: false,
+          });
+          playSound("success");
+          setConfirmationResult({
+            type: "success",
+            title: "Нэмэлт порц",
+            message: "Өөр киоск дээр бүртгэгдсэн тул нэмэлт порцоор хадгаллаа",
+            employeeName: employee.name,
+            mealName: getMealName(targetMealType),
+          });
+          setScanStateWithRef("result");
+          return;
+        }
+
         // 8. Амжилттай бүртгэх
         await doCreateLog({
           employee,
@@ -481,6 +553,7 @@ export function ScanScreen() {
       diningHallId,
       doCreateLog,
       handleSubEmployeeScan,
+      deviceUuid,
       playSound,
       setScanStateWithRef,
     ],

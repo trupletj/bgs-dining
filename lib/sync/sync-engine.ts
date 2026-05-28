@@ -1,6 +1,11 @@
-import { db, Employee, type SyncLog } from "@/lib/db";
+import { db, Employee, type MealLog, type SyncLog } from "@/lib/db";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getLocalDate, KIOSK_CONFIG_KEYS } from "@/lib/constants";
+import {
+  buildExtraServingSyncKey,
+  findServerRowsBySyncKey,
+  isDifferentDeviceConflict,
+} from "@/lib/sync/meal-log-conflicts";
 
 const BATCH_SIZE = 100;
 
@@ -12,6 +17,7 @@ export type SyncResults = {
   overridesPulled: number;
   subMealPlansPulled: number;
   expectedMealCountsPulled: number;
+  serverMealLogCachePulled: number;
   logsPushed: number;
   isOffline?: boolean;
 };
@@ -21,6 +27,23 @@ type ExpectedMealRow = {
   expected_count: number | string | null;
   actual_count: number | string | null;
 };
+
+type ServerMealLogRow = {
+  sync_key: string | null;
+  user_id: string | null;
+  sub_employee_id: string | null;
+  bteg_id: string | null;
+  meal_type: string | null;
+  date: string | null;
+  dining_hall_id: number | string | null;
+  device_uuid: string | null;
+  is_extra_serving: boolean | null;
+  scanned_at: string | null;
+};
+
+function normalizeMealType(mealType: string): string {
+  return mealType === "nightmeal" ? "night_meal" : mealType;
+}
 
 async function logSync(
   type: SyncLog["type"],
@@ -553,6 +576,77 @@ export async function pullExpectedMealCounts(): Promise<number> {
   }
 }
 
+export async function pullCurrentMealLogCache(params: {
+  diningHallId: number;
+  date: string;
+  mealType: string;
+}): Promise<number> {
+  if (!navigator.onLine) return 0;
+
+  const logId = await logSync("pull-server-meal-log-cache", "started", 0);
+
+  try {
+    const supabase = await getSupabaseClient();
+    const mealType = normalizeMealType(params.mealType);
+    const { data, error } = await supabase
+      .from("meal_logs")
+      .select(
+        "sync_key, user_id, sub_employee_id, bteg_id, meal_type, date, dining_hall_id, device_uuid, is_extra_serving, scanned_at",
+      )
+      .eq("dining_hall_id", params.diningHallId)
+      .eq("date", params.date)
+      .eq("meal_type", mealType);
+
+    if (error) throw new Error(error.message);
+
+    const fetchedAt = new Date().toISOString();
+    const rows = ((data ?? []) as ServerMealLogRow[])
+      .filter((row) => row.sync_key)
+      .map((row) => ({
+        syncKey: row.sync_key!,
+        userId: row.user_id,
+        subEmployeeId: row.sub_employee_id,
+        btegId: row.bteg_id ?? "",
+        mealType: row.meal_type ?? mealType,
+        date: row.date ?? params.date,
+        diningHallId: Number(row.dining_hall_id ?? params.diningHallId),
+        deviceUuid: row.device_uuid,
+        isExtraServing: Boolean(row.is_extra_serving),
+        scannedAt: row.scanned_at ?? fetchedAt,
+        fetchedAt,
+      }));
+
+    await db.transaction("rw", db.serverMealLogCache, async () => {
+      await db.serverMealLogCache
+        .where("[diningHallId+date+mealType]")
+        .equals([params.diningHallId, params.date, mealType])
+        .delete();
+      if (rows.length > 0) {
+        await db.serverMealLogCache.bulkPut(rows);
+      }
+    });
+
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "success",
+        recordCount: rows.length,
+        completedAt: new Date().toISOString(),
+      });
+    }
+
+    return rows.length;
+  } catch (error) {
+    if (typeof logId === "number") {
+      await db.syncLog.update(logId, {
+        status: "failed",
+        completedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    throw error;
+  }
+}
+
 export async function pushMealLogs(): Promise<number> {
   const pending = await db.mealLogs
     .where("syncStatus")
@@ -569,8 +663,58 @@ export async function pushMealLogs(): Promise<number> {
 
     for (let i = 0; i < pending.length; i += BATCH_SIZE) {
       const batch = pending.slice(i, i + BATCH_SIZE);
+      const existingBySyncKey = await findServerRowsBySyncKey(
+        batch.map((log) => log.syncKey),
+      );
 
-      const rows = batch.map((log) => ({
+      const uploadBatch: MealLog[] = [];
+      const alreadySyncedIds: number[] = [];
+
+      for (const log of batch) {
+        const serverLog = existingBySyncKey.get(log.syncKey);
+
+        if (!serverLog) {
+          uploadBatch.push(log);
+          continue;
+        }
+
+        if (!isDifferentDeviceConflict(log.deviceUuid, serverLog.device_uuid)) {
+          if (typeof log.id === "number") alreadySyncedIds.push(log.id);
+          continue;
+        }
+
+        if (!log.isExtraServing && typeof log.id === "number") {
+          const syncKey = buildExtraServingSyncKey(log);
+          const extraLog = {
+            ...log,
+            isExtraServing: true,
+            syncKey,
+          };
+
+          await db.mealLogs.update(log.id, {
+            isExtraServing: true,
+            syncKey,
+          });
+          uploadBatch.push(extraLog);
+          continue;
+        }
+
+        if (typeof log.id === "number") {
+          await db.mealLogs.update(log.id, { syncStatus: "failed" });
+        }
+      }
+
+      if (alreadySyncedIds.length > 0) {
+        await db.mealLogs
+          .where("id")
+          .anyOf(alreadySyncedIds)
+          .modify({ syncStatus: "synced" });
+        totalSynced += alreadySyncedIds.length;
+      }
+
+      if (uploadBatch.length === 0) continue;
+
+      const rows = uploadBatch.map((log) => ({
         user_id: !log.userId || log.userId === "unknown" ? null : log.userId,
         bteg_id: log.btegId || "",
         dining_hall_id: log.diningHallId,
@@ -588,15 +732,14 @@ export async function pushMealLogs(): Promise<number> {
 
       const { error } = await supabase
         .from("meal_logs")
-        .upsert(rows, { onConflict: "sync_key", ignoreDuplicates: true });
+        .insert(rows);
 
       if (error) throw new Error(error.message);
 
-      // Mark batch as synced
-      const ids = batch.map((l) => l.id!).filter(Boolean);
+      const ids = uploadBatch.map((l) => l.id!).filter(Boolean);
       await db.mealLogs.where("id").anyOf(ids).modify({ syncStatus: "synced" });
 
-      totalSynced += batch.length;
+      totalSynced += uploadBatch.length;
     }
 
     await db.kioskConfig.put({
@@ -651,6 +794,7 @@ export async function runFullSync(): Promise<SyncResults> {
     overridesPulled: 0,
     subMealPlansPulled: 0,
     expectedMealCountsPulled: 0,
+    serverMealLogCachePulled: 0,
     logsPushed: 0,
   };
   if (!navigator.onLine) {

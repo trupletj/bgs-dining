@@ -111,6 +111,7 @@ export const MEAL_TYPE_COLUMN_MAP: Record<string, string | null> = {
 export const SCANNER_KEYSTROKE_THRESHOLD_MS = 50;
 export const CONFIRMATION_DISPLAY_DURATION_MS = 4000;
 export const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+export const MEAL_LOG_PUSH_INTERVAL_MS = 60 * 1000; // 1 minute
 export const HEARTBEAT_INTERVAL_MS = 60 * 1000; // 1 minute
 export const DEFAULT_ADMIN_PIN = "1234";
 

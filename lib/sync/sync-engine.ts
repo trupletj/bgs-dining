@@ -41,8 +41,55 @@ type ServerMealLogRow = {
   scanned_at: string | null;
 };
 
+type MealLogInsertRow = {
+  user_id: string | null;
+  bteg_id: string;
+  dining_hall_id: number;
+  meal_type: string;
+  scanned_at: string;
+  date: string;
+  chef_id: number | null;
+  is_extra_serving: boolean;
+  is_manual_override: boolean;
+  is_wrong_location: boolean;
+  device_uuid: string | null;
+  sync_key: string;
+  sub_employee_id: string | null;
+};
+
 function normalizeMealType(mealType: string): string {
   return mealType === "nightmeal" ? "night_meal" : mealType;
+}
+
+function mealLogToInsertRow(log: MealLog): MealLogInsertRow {
+  return {
+    user_id: !log.userId || log.userId === "unknown" ? null : log.userId,
+    bteg_id: log.btegId || "",
+    dining_hall_id: log.diningHallId,
+    meal_type: normalizeMealType(log.mealType),
+    scanned_at: log.scannedAt,
+    date: log.date,
+    chef_id: log.chefId,
+    is_extra_serving: log.isExtraServing,
+    is_manual_override: log.isManualOverride,
+    is_wrong_location: log.isWrongLocation,
+    device_uuid: log.deviceUuid,
+    sync_key: log.syncKey,
+    sub_employee_id: log.subEmployeeId,
+  };
+}
+
+function isDuplicateSyncKeyError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeError = error as { code?: string; message?: string; details?: string };
+  const text = `${maybeError.message ?? ""} ${maybeError.details ?? ""}`;
+
+  return (
+    maybeError.code === "23505" ||
+    (text.includes("duplicate key value") &&
+      text.includes("meal_logs_sync_key_key"))
+  );
 }
 
 async function logSync(
@@ -661,6 +708,61 @@ export async function pushMealLogs(): Promise<number> {
   try {
     const supabase = await getSupabaseClient();
 
+    const markLogSynced = async (log: MealLog) => {
+      if (typeof log.id === "number") {
+        await db.mealLogs.update(log.id, { syncStatus: "synced" });
+      }
+    };
+
+    const uploadSingleLog = async (log: MealLog): Promise<boolean> => {
+      const { error } = await supabase
+        .from("meal_logs")
+        .insert(mealLogToInsertRow(log));
+
+      if (!error) {
+        await markLogSynced(log);
+        return true;
+      }
+
+      if (!isDuplicateSyncKeyError(error)) {
+        throw new Error(error.message);
+      }
+
+      const serverLog = (await findServerRowsBySyncKey([log.syncKey])).get(
+        log.syncKey,
+      );
+
+      if (
+        serverLog &&
+        isDifferentDeviceConflict(log.deviceUuid, serverLog.device_uuid) &&
+        !log.isExtraServing &&
+        typeof log.id === "number"
+      ) {
+        const extraLog = {
+          ...log,
+          isExtraServing: true,
+          syncKey: buildExtraServingSyncKey(log),
+        };
+
+        await db.mealLogs.update(log.id, {
+          isExtraServing: true,
+          syncKey: extraLog.syncKey,
+        });
+
+        const { error: extraError } = await supabase
+          .from("meal_logs")
+          .insert(mealLogToInsertRow(extraLog));
+
+        if (extraError) throw new Error(extraError.message);
+
+        await markLogSynced(extraLog);
+        return true;
+      }
+
+      await markLogSynced(log);
+      return true;
+    };
+
     for (let i = 0; i < pending.length; i += BATCH_SIZE) {
       const batch = pending.slice(i, i + BATCH_SIZE);
       const existingBySyncKey = await findServerRowsBySyncKey(
@@ -714,31 +816,23 @@ export async function pushMealLogs(): Promise<number> {
 
       if (uploadBatch.length === 0) continue;
 
-      const rows = uploadBatch.map((log) => ({
-        user_id: !log.userId || log.userId === "unknown" ? null : log.userId,
-        bteg_id: log.btegId || "",
-        dining_hall_id: log.diningHallId,
-        meal_type: log.mealType === "nightmeal" ? "night_meal" : log.mealType,
-        scanned_at: log.scannedAt,
-        date: log.date,
-        chef_id: log.chefId,
-        is_extra_serving: log.isExtraServing,
-        is_manual_override: log.isManualOverride,
-        is_wrong_location: log.isWrongLocation,
-        device_uuid: log.deviceUuid,
-        sync_key: log.syncKey,
-        sub_employee_id: log.subEmployeeId,
-      }));
+      const rows = uploadBatch.map(mealLogToInsertRow);
 
       const { error } = await supabase
         .from("meal_logs")
         .insert(rows);
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        if (!isDuplicateSyncKeyError(error)) throw new Error(error.message);
+
+        for (const log of uploadBatch) {
+          if (await uploadSingleLog(log)) totalSynced += 1;
+        }
+        continue;
+      }
 
       const ids = uploadBatch.map((l) => l.id!).filter(Boolean);
       await db.mealLogs.where("id").anyOf(ids).modify({ syncStatus: "synced" });
-
       totalSynced += uploadBatch.length;
     }
 

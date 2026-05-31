@@ -14,6 +14,12 @@ export function buildExtraServingSyncKey(log: Pick<MealLog, "syncKey" | "id">): 
   return `${log.syncKey}-extra-${Date.now()}-${log.id ?? crypto.randomUUID()}`;
 }
 
+export function buildManualOverrideSyncKey(
+  log: Pick<MealLog, "syncKey" | "id" | "diningHallId">,
+): string {
+  return `${log.syncKey}-manual-${log.diningHallId}-${Date.now()}-${log.id ?? crypto.randomUUID()}`;
+}
+
 export function isDifferentDeviceConflict(
   localDeviceUuid: string | null | undefined,
   serverDeviceUuid: string | null | undefined,

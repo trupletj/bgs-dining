@@ -14,7 +14,7 @@ import {
   getAllowedMealTypesForShift,
   getLocalDate,
   KIOSK_CONFIG_KEYS,
-  resolveTargetMealType,
+  resolveTargetMealTypeFromActiveSlots,
 } from "@/lib/constants";
 import {
   Dialog,
@@ -44,7 +44,11 @@ export const ManualEntry = React.memo(function ManualEntry() {
   const [search, setSearch] = useState("");
   const [duplicate, setDuplicate] = useState<DuplicateInfo | null>(null);
 
-  const { currentMeal } = useCurrentMeal();
+  const { currentMeal, activeMeals } = useCurrentMeal();
+  const activeMealTypes = useMemo(
+    () => activeMeals.map((meal) => meal.mealType),
+    [activeMeals],
+  );
   const { value: diningHallId } = useKioskConfig(
     KIOSK_CONFIG_KEYS.DINING_HALL_ID,
   );
@@ -103,8 +107,9 @@ export const ManualEntry = React.memo(function ManualEntry() {
       employee.shiftEnd,
       new Date(),
     );
-    const targetMealType = resolveTargetMealType(
+    const targetMealType = resolveTargetMealTypeFromActiveSlots(
       allowedMeals,
+      activeMealTypes,
       currentMeal.mealType,
     );
 
@@ -223,8 +228,9 @@ export const ManualEntry = React.memo(function ManualEntry() {
       employee.shiftEnd,
       new Date(),
     );
-    const targetMealType = resolveTargetMealType(
+    const targetMealType = resolveTargetMealTypeFromActiveSlots(
       allowedMeals,
+      activeMealTypes,
       currentMeal.mealType,
     );
     const { isWrongLocation } = await checkAssignedLocation(
@@ -254,7 +260,14 @@ export const ManualEntry = React.memo(function ManualEntry() {
 
     resetAndClose();
     toast.success(`${employee.name} нэмэлт порц бүртгэгдлээ`);
-  }, [duplicate, currentMeal, diningHallId, activeChefId, deviceUuid]);
+  }, [
+    duplicate,
+    currentMeal,
+    activeMealTypes,
+    diningHallId,
+    activeChefId,
+    deviceUuid,
+  ]);
 
   // ── Нэмэлт порц (гэрээт ажилтан) ──────────────────────
   const handleAddExtraServingSubEmployee = useCallback(async () => {

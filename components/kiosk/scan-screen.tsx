@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { StatusBar } from "@/components/kiosk/status-bar";
 import { CurrentMealDisplay } from "@/components/kiosk/current-meal-display";
 import { IdleScreen } from "@/components/kiosk/idle-screen";
@@ -33,6 +33,7 @@ import {
   KIOSK_CONFIG_KEYS,
   MEAL_NAME_MAP,
   resolveTargetMealType,
+  resolveTargetMealTypeFromActiveSlots,
 } from "@/lib/constants";
 import { ScrollArea } from "../ui/scroll-area";
 
@@ -54,6 +55,7 @@ interface PendingModal {
   existingLog?: MealLog;
   assignedLocationId?: number | null;
   targetMealType?: string;
+  isExtraServingOnManualApprove?: boolean;
 }
 
 export function ScanScreen() {
@@ -69,6 +71,10 @@ export function ScanScreen() {
   const scanStateRef = useRef<ScanState>("idle");
 
   const currentMeal = activeMeals.length > 0 ? activeMeals[0] : null;
+  const activeMealTypes = useMemo(
+    () => activeMeals.map((meal) => meal.mealType),
+    [activeMeals],
+  );
 
   const { value: diningHallId } = useKioskConfig(
     KIOSK_CONFIG_KEYS.DINING_HALL_ID,
@@ -110,9 +116,12 @@ export function ScanScreen() {
       const baseKey = subEmployeeId
         ? `sub-${subEmployeeId}-${params.mealType}-${today}`
         : `${userId}-${params.mealType}-${today}`;
-      const syncKey = params.isExtraServing
-        ? `${baseKey}-extra-${Date.now()}`
-        : baseKey;
+      const suffix = params.isExtraServing
+        ? `extra-${Date.now()}`
+        : params.isManualOverride
+          ? `manual-${diningHallId}-${Date.now()}`
+          : null;
+      const syncKey = suffix ? `${baseKey}-${suffix}` : baseKey;
 
       await createMealLog({
         userId,
@@ -410,15 +419,21 @@ export function ScanScreen() {
           allowedMeals,
           currentMeal.mealType,
         );
+        const resolvedTargetMealType = resolveTargetMealTypeFromActiveSlots(
+          allowedMeals,
+          activeMealTypes,
+          targetMealType,
+        );
 
-        if (!allowedMeals.includes(targetMealType)) {
+        if (!allowedMeals.includes(resolvedTargetMealType)) {
           setPendingModal({
             type: "unauthorized",
             employee,
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
             assignedLocationId: null,
-            message: `${employee.name} энэ хоолыг (${MEAL_NAME_MAP[targetMealType] || targetMealType}) идэх хуваарьгүй байна.`,
+            targetMealType: resolvedTargetMealType,
+            message: `${employee.name} энэ хоолыг (${MEAL_NAME_MAP[resolvedTargetMealType] || resolvedTargetMealType}) идэх хуваарьгүй байна.`,
           });
           setScanStateWithRef("idle");
           return;
@@ -428,7 +443,7 @@ export function ScanScreen() {
         const today = getLocalDate();
         const override = await db.mealLocationOverrides
           .where("[userId+date+mealType]")
-          .equals([employee.id, today, targetMealType])
+          .equals([employee.id, today, resolvedTargetMealType])
           .first();
 
         let assignedLocationId: number | null = null;
@@ -437,7 +452,7 @@ export function ScanScreen() {
         } else {
           const config = await db.userMealConfigs.get(employee.id);
           const location = config
-            ? getMealLocationForSlot(config, targetMealType)
+            ? getMealLocationForSlot(config, resolvedTargetMealType)
             : null;
           if (location !== "skip" && location !== null) {
             assignedLocationId = Number(location);
@@ -453,6 +468,22 @@ export function ScanScreen() {
           const targetHall = await db.diningHalls.get(assignedLocationId);
           const targetHallName =
             targetHall?.name ?? `Гал тогоо #${assignedLocationId}`;
+          const existingWrongLocationLog = await db.mealLogs
+            .where("userId")
+            .equals(employee.id)
+            .and(
+              (log) =>
+                log.mealType === resolvedTargetMealType &&
+                log.date === today &&
+                log.diningHallId === Number(diningHallId),
+            )
+            .first();
+          const cachedWrongLocationLog = await findNormalMealLogInCache({
+            userId: employee.id,
+            mealType: resolvedTargetMealType,
+            date: today,
+            diningHallId: Number(diningHallId),
+          });
 
           setPendingModal({
             type: "unauthorized",
@@ -460,6 +491,10 @@ export function ScanScreen() {
             assignedLocationId,
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
+            targetMealType: resolvedTargetMealType,
+            isExtraServingOnManualApprove: Boolean(
+              existingWrongLocationLog || cachedWrongLocationLog,
+            ),
             message: `${employee.name} нь "${targetHallName}"-д хуваарьтай байна. Энд гараар зөвшөөрөх үү?`,
           });
           setScanStateWithRef("idle");
@@ -471,6 +506,7 @@ export function ScanScreen() {
             assignedLocationId: null,
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
+            targetMealType: resolvedTargetMealType,
             message: `${employee.name} энэ хоолонд бүртгэлгүй байна.`,
           });
           setScanStateWithRef("idle");
@@ -480,7 +516,7 @@ export function ScanScreen() {
         // 7. Давхардал шалгах
         const existing = await checkDuplicateMealLog(
           employee.id,
-          targetMealType,
+          resolvedTargetMealType,
           lookupIdCard || "",
         );
         if (existing) {
@@ -490,7 +526,7 @@ export function ScanScreen() {
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
             assignedLocationId,
-            targetMealType: targetMealType,
+            targetMealType: resolvedTargetMealType,
             message: `${employee.name} аль хэдийн бүртгүүлсэн`,
             existingLog: existing,
           });
@@ -500,7 +536,7 @@ export function ScanScreen() {
 
         const cachedExisting = await findNormalMealLogInCache({
           userId: employee.id,
-          mealType: targetMealType,
+          mealType: resolvedTargetMealType,
           date: today,
           diningHallId: Number(diningHallId),
         });
@@ -511,7 +547,7 @@ export function ScanScreen() {
           await doCreateLog({
             employee,
             isExtraServing: true,
-            mealType: targetMealType,
+            mealType: resolvedTargetMealType,
             isManualOverride: false,
           });
           playSound("success");
@@ -520,7 +556,7 @@ export function ScanScreen() {
             title: "Нэмэлт порц",
             message: "Өөр киоск дээр бүртгэгдсэн тул нэмэлт порцоор хадгаллаа",
             employeeName: employee.name,
-            mealName: getMealName(targetMealType),
+            mealName: getMealName(resolvedTargetMealType),
           });
           setScanStateWithRef("result");
           return;
@@ -530,7 +566,7 @@ export function ScanScreen() {
         await doCreateLog({
           employee,
           isExtraServing: false,
-          mealType: targetMealType,
+          mealType: resolvedTargetMealType,
           isManualOverride: false,
         });
         playSound("success");
@@ -539,7 +575,7 @@ export function ScanScreen() {
           title: "Амжилттай",
           message: "Хоолны бүртгэл хийгдлээ",
           employeeName: employee.name,
-          mealName: getMealName(targetMealType),
+          mealName: getMealName(resolvedTargetMealType),
         });
         setScanStateWithRef("result");
       } catch (error) {
@@ -550,6 +586,7 @@ export function ScanScreen() {
     // 5. Dependency-ээс scanState хасагдаж, setScanStateWithRef нэмэгдсэн
     [
       currentMeal,
+      activeMealTypes,
       diningHallId,
       doCreateLog,
       handleSubEmployeeScan,
@@ -578,7 +615,7 @@ export function ScanScreen() {
         .first();
     }
 
-    let targetMealType = currentMeal.mealType;
+    let targetMealType = pendingModal.targetMealType || currentMeal.mealType;
     if (employee) {
       const allowedMeals = getAllowedMealTypesForShift(
         employee.shiftStart,
@@ -586,9 +623,17 @@ export function ScanScreen() {
         new Date(),
       );
 
+      targetMealType =
+        pendingModal.targetMealType ||
+        resolveTargetMealTypeFromActiveSlots(
+          allowedMeals,
+          activeMealTypes,
+          currentMeal.mealType,
+        );
+
       targetMealType = resolveTargetMealType(
         allowedMeals,
-        currentMeal.mealType,
+        targetMealType,
       );
 
       const override = await db.mealLocationOverrides
@@ -612,11 +657,12 @@ export function ScanScreen() {
     const isWrongLocation =
       assignedLocationId !== null &&
       assignedLocationId !== Number(diningHallId);
+    const isExtraServing = Boolean(pendingModal.isExtraServingOnManualApprove);
 
     if (employee) {
       await doCreateLog({
         employee,
-        isExtraServing: false,
+        isExtraServing,
         mealType: targetMealType,
         isManualOverride: true,
         isWrongLocation,
@@ -645,10 +691,12 @@ export function ScanScreen() {
     setPendingModal(null);
     setConfirmationResult({
       type: "success",
-      title: "Гараар зөвшөөрлөө",
-      message: isWrongLocation
-        ? "Буруу байршилд бүртгэгдлээ"
-        : "Бүртгэл хадгалагдлаа",
+      title: isExtraServing ? "Нэмэлт порц" : "Гараар зөвшөөрлөө",
+      message: isExtraServing
+        ? "Нэмэлт порцоор бүртгэгдлээ"
+        : isWrongLocation
+          ? "Буруу байршилд бүртгэгдлээ"
+          : "Бүртгэл хадгалагдлаа",
       employeeName: employee?.name ?? "Бүртгэлгүй ажилтан",
       mealName: getMealName(targetMealType),
     });
@@ -656,6 +704,7 @@ export function ScanScreen() {
   }, [
     pendingModal,
     currentMeal,
+    activeMealTypes,
     diningHallId,
     activeChefId,
     deviceUuid,
@@ -808,7 +857,9 @@ export function ScanScreen() {
           onClose={() => setPendingModal(null)}
           onAddExtraServing={handleAddExtraServing}
           employeeName={pendingModal.employee.name}
-          mealName={getMealName(currentMeal?.mealType ?? "")}
+          mealName={getMealName(
+            pendingModal.targetMealType ?? currentMeal?.mealType ?? "",
+          )}
           existingScanTime={pendingModal.existingLog?.scannedAt ?? ""}
         />
       )}

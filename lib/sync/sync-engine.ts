@@ -3,6 +3,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { getLocalDate, KIOSK_CONFIG_KEYS } from "@/lib/constants";
 import {
   buildExtraServingSyncKey,
+  buildManualOverrideSyncKey,
   findServerRowsBySyncKey,
   isDifferentDeviceConflict,
 } from "@/lib/sync/meal-log-conflicts";
@@ -738,6 +739,26 @@ export async function pushMealLogs(): Promise<number> {
         !log.isExtraServing &&
         typeof log.id === "number"
       ) {
+        if (log.isManualOverride) {
+          const manualLog = {
+            ...log,
+            syncKey: buildManualOverrideSyncKey(log),
+          };
+
+          await db.mealLogs.update(log.id, {
+            syncKey: manualLog.syncKey,
+          });
+
+          const { error: manualError } = await supabase
+            .from("meal_logs")
+            .insert(mealLogToInsertRow(manualLog));
+
+          if (manualError) throw new Error(manualError.message);
+
+          await markLogSynced(manualLog);
+          return true;
+        }
+
         const extraLog = {
           ...log,
           isExtraServing: true,
@@ -786,6 +807,20 @@ export async function pushMealLogs(): Promise<number> {
         }
 
         if (!log.isExtraServing && typeof log.id === "number") {
+          if (log.isManualOverride) {
+            const syncKey = buildManualOverrideSyncKey(log);
+            const manualLog = {
+              ...log,
+              syncKey,
+            };
+
+            await db.mealLogs.update(log.id, {
+              syncKey,
+            });
+            uploadBatch.push(manualLog);
+            continue;
+          }
+
           const syncKey = buildExtraServingSyncKey(log);
           const extraLog = {
             ...log,

@@ -244,3 +244,24 @@ export function resolveTargetMealType(
   // Хэрэв ямар ч тохирох зүйл олдохгүй бол үндсэн төрлийг буцаана (Энэ нь дараагийн шатны unauthorized шалгалт дээр унана)
   return currentMealType;
 }
+
+export function resolveTargetMealTypeFromActiveSlots(
+  allowedMeals: string[],
+  activeMealTypes: string[],
+  fallbackMealType: string,
+): string {
+  for (const mealType of activeMealTypes) {
+    if (allowedMeals.includes(mealType)) {
+      return mealType;
+    }
+  }
+
+  for (const mealType of activeMealTypes) {
+    const resolved = resolveTargetMealType(allowedMeals, mealType);
+    if (allowedMeals.includes(resolved)) {
+      return resolved;
+    }
+  }
+
+  return resolveTargetMealType(allowedMeals, fallbackMealType);
+}

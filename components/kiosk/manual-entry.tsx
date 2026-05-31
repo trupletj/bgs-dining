@@ -116,7 +116,8 @@ export const ManualEntry = React.memo(function ManualEntry() {
     const existing = await checkDuplicateMealLog(
       employee.id,
       targetMealType,
-      today,
+      employee.idcardNumber,
+      Number(diningHallId),
     );
     if (existing) {
       setDuplicate({ employee, existingLog: existing });
@@ -174,7 +175,12 @@ export const ManualEntry = React.memo(function ManualEntry() {
     const existing = await db.mealLogs
       .where("subEmployeeId")
       .equals(sub.id)
-      .and((log) => log.mealType === mealType && log.date === today)
+      .and(
+        (log) =>
+          log.mealType === mealType &&
+          log.date === today &&
+          log.diningHallId === Number(diningHallId),
+      )
       .first();
 
     if (existing) {

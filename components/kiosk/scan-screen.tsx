@@ -55,7 +55,6 @@ interface PendingModal {
   existingLog?: MealLog;
   assignedLocationId?: number | null;
   targetMealType?: string;
-  isExtraServingOnManualApprove?: boolean;
 }
 
 export function ScanScreen() {
@@ -145,6 +144,41 @@ export function ScanScreen() {
     [diningHallId, activeChefId, deviceUuid],
   );
 
+  const hasNormalMealLogAtCurrentHall = useCallback(
+    async (params: {
+      userId: string;
+      mealType: string;
+      date: string;
+    }): Promise<boolean> => {
+      if (!diningHallId) return false;
+      const currentDiningHallId = Number(diningHallId);
+
+      const localLog = await db.mealLogs
+        .where("userId")
+        .equals(params.userId)
+        .and(
+          (log) =>
+            log.mealType === params.mealType &&
+            log.date === params.date &&
+            log.diningHallId === currentDiningHallId &&
+            !log.isExtraServing,
+        )
+        .first();
+
+      if (localLog) return true;
+
+      const cachedLog = await findNormalMealLogInCache({
+        userId: params.userId,
+        mealType: params.mealType,
+        date: params.date,
+        diningHallId: currentDiningHallId,
+      });
+
+      return Boolean(cachedLog);
+    },
+    [diningHallId],
+  );
+
   const handleSubEmployeeScan = useCallback(
     async (subId: string, btegId: string | null) => {
       if (!currentMeal || !diningHallId) {
@@ -176,7 +210,12 @@ export function ScanScreen() {
       const existing = await db.mealLogs
         .where("subEmployeeId")
         .equals(subId)
-        .and((log) => log.mealType === mealType && log.date === today)
+        .and(
+          (log) =>
+            log.mealType === mealType &&
+            log.date === today &&
+            log.diningHallId === Number(diningHallId),
+        )
         .first();
 
       if (existing) {
@@ -368,6 +407,7 @@ export function ScanScreen() {
             "", // userId байхгүй
             currentMeal.mealType,
             lookupIdCard || "", // QR-ын дугаараар хайх
+            Number(diningHallId),
           );
 
           if (existingUnregistered) {
@@ -468,23 +508,6 @@ export function ScanScreen() {
           const targetHall = await db.diningHalls.get(assignedLocationId);
           const targetHallName =
             targetHall?.name ?? `Гал тогоо #${assignedLocationId}`;
-          const existingWrongLocationLog = await db.mealLogs
-            .where("userId")
-            .equals(employee.id)
-            .and(
-              (log) =>
-                log.mealType === resolvedTargetMealType &&
-                log.date === today &&
-                log.diningHallId === Number(diningHallId),
-            )
-            .first();
-          const cachedWrongLocationLog = await findNormalMealLogInCache({
-            userId: employee.id,
-            mealType: resolvedTargetMealType,
-            date: today,
-            diningHallId: Number(diningHallId),
-          });
-
           setPendingModal({
             type: "unauthorized",
             employee,
@@ -492,9 +515,6 @@ export function ScanScreen() {
             btegId: lookupBteg || "",
             scannedCode: lookupIdCard || code,
             targetMealType: resolvedTargetMealType,
-            isExtraServingOnManualApprove: Boolean(
-              existingWrongLocationLog || cachedWrongLocationLog,
-            ),
             message: `${employee.name} нь "${targetHallName}"-д хуваарьтай байна. Энд гараар зөвшөөрөх үү?`,
           });
           setScanStateWithRef("idle");
@@ -518,6 +538,7 @@ export function ScanScreen() {
           employee.id,
           resolvedTargetMealType,
           lookupIdCard || "",
+          Number(diningHallId),
         );
         if (existing) {
           setPendingModal({
@@ -657,7 +678,13 @@ export function ScanScreen() {
     const isWrongLocation =
       assignedLocationId !== null &&
       assignedLocationId !== Number(diningHallId);
-    const isExtraServing = Boolean(pendingModal.isExtraServingOnManualApprove);
+    const isExtraServing = employee
+      ? await hasNormalMealLogAtCurrentHall({
+          userId: employee.id,
+          mealType: targetMealType,
+          date: today,
+        })
+      : false;
 
     if (employee) {
       await doCreateLog({
@@ -709,6 +736,7 @@ export function ScanScreen() {
     activeChefId,
     deviceUuid,
     doCreateLog,
+    hasNormalMealLogAtCurrentHall,
     setScanStateWithRef,
   ]);
 

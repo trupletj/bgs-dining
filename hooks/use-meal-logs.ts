@@ -67,6 +67,7 @@ export async function checkDuplicateMealLog(
   userId: string,
   mealType: string,
   idcardNumber?: string,
+  diningHallId?: number | null,
 ): Promise<MealLog | undefined> {
   const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
 
@@ -74,7 +75,12 @@ export async function checkDuplicateMealLog(
     return await db.mealLogs
       .where("userId")
       .equals(userId)
-      .and((log) => log.mealType === mealType && log.scannedAt > sixHoursAgo)
+      .and(
+        (log) =>
+          log.mealType === mealType &&
+          log.scannedAt > sixHoursAgo &&
+          (!diningHallId || log.diningHallId === diningHallId),
+      )
       .first();
   }
 
@@ -82,7 +88,12 @@ export async function checkDuplicateMealLog(
     return await db.mealLogs
       .where("idcardNumber")
       .equals(idcardNumber)
-      .and((log) => log.mealType === mealType && log.scannedAt > sixHoursAgo)
+      .and(
+        (log) =>
+          log.mealType === mealType &&
+          log.scannedAt > sixHoursAgo &&
+          (!diningHallId || log.diningHallId === diningHallId),
+      )
       .first();
   }
 
